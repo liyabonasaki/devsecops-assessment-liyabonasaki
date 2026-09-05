@@ -29,8 +29,8 @@ services:
   # ---------------------------------------------------------------------------
   country-service:
     build:
-      context: ../assess/country-service-main
-      dockerfile: ../application/country-service/Dockerfile
+      context: ../application/country-service
+      dockerfile: Dockerfile
     image: country-service:latest
     container_name: country-service
 
@@ -102,8 +102,8 @@ services:
   # ---------------------------------------------------------------------------
   country-flags-app:
     build:
-      context: ../assess/country-flags-app-main
-      dockerfile: ../application/country-flags-app/Dockerfile
+      context: ../application/country-flags-app
+      dockerfile: Dockerfile
       args:
         # Backend URL as seen from the browser — uses the host/proxy address
         REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8081}

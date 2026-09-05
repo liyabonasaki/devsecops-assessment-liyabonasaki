@@ -37,7 +37,7 @@ python secret_detector.py --path ./app --severity HIGH
 python secret_detector.py --path ./app --format json --output report.json
 
 # Scan a single file
-python secret_detector.py --path ./assess/country-service-main/src/main/resources/application.properties
+python secret_detector.py --path ../../application/country-service/src/main/resources/application.properties
 ```
 
 ## Example Output

@@ -118,7 +118,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: assess/country-flags-app-main
+        working-directory: application/country-flags-app
 
     steps:
       - name: Checkout code
@@ -129,7 +129,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
-          cache-dependency-path: assess/country-flags-app-main/package-lock.json
+          cache-dependency-path: application/country-flags-app/package-lock.json
 
       - name: Install dependencies
         run: npm ci --prefer-offline
@@ -245,7 +245,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: assess/country-service-main
+        working-directory: application/country-service
 
     steps:
       - name: Checkout code
@@ -380,14 +380,14 @@ jobs:
 
       - name: Build country-service JAR (skip tests for scan speed)
         run: |
-          mvn package -DskipTests --no-transfer-progress -f assess/country-service-main/pom.xml
+          mvn package -DskipTests --no-transfer-progress -f application/country-service/pom.xml
         continue-on-error: true
 
       - name: Build country-service Docker image
         run: |
           docker build -t country-service:scan \
             -f application/country-service/Dockerfile \
-            assess/country-service-main/ 2>/dev/null || \
+            application/country-service/ 2>/dev/null || \
           echo "Dockerfile not found or build failed — skipping image scan"
         continue-on-error: true
 
@@ -415,7 +415,7 @@ jobs:
         run: |
           docker build -t country-flags-app:scan \
             -f application/country-flags-app/Dockerfile \
-            assess/country-flags-app-main/ 2>/dev/null || \
+            application/country-flags-app/ 2>/dev/null || \
           echo "Dockerfile not found or build failed — skipping image scan"
         continue-on-error: true
 

@@ -19,18 +19,16 @@
 
 ```
 devsecops-assessment-liyabonasaki/
-├── assess/                              # Provided source code (cloned)
-│   ├── country-flags-app-main/          # React 18 frontend
-│   └── country-service-main/            # Spring Boot 3 / Java 11 backend
-│
 ├── .github/
 │   └── workflows/
 │       └── secure-pipeline.yml          # Block 2 — GitHub Actions pipeline
 │
-├── application/
-│   ├── country-service/
+├── application/                         # Provided source + your Dockerfiles
+│   ├── country-service/                 # Spring Boot 3 / Java 11 backend
+│   │   ├── src/, pom.xml, mvnw          # (provided source)
 │   │   └── Dockerfile                   # Block 3 — multi-stage JDK→JRE
-│   └── country-flags-app/
+│   └── country-flags-app/               # React 18 frontend
+│       ├── src/, package.json           # (provided source)
 │       ├── Dockerfile                   # Block 3 — multi-stage Node→Nginx
 │       └── nginx.conf                   # Hardened Nginx configuration
 │
@@ -94,8 +92,8 @@ prerequisites.
 ## Assumptions Made
 
 1. **Python 3.8+** is available in the GitHub Actions runner (ubuntu-latest ships with 3.11).
-2. The `assess/` directory is committed inside the assessment repo so that the pipeline
-   can reference source paths relatively (e.g. `assess/country-service-main/pom.xml`).
+2. The provided source code lives under `application/country-service/` and
+   `application/country-flags-app/`, each alongside its Dockerfile.
 3. `SEMGREP_APP_TOKEN` and `NVD_API_KEY` are **optional** GitHub secrets. The pipeline
    runs fully without them — Semgrep falls back to local-only mode and OWASP DC uses
    the cached NVD database.
