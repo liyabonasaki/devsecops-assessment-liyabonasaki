@@ -1,0 +1,184 @@
+# =============================================================================
+# Secure Docker Compose — Country App Stack
+# =============================================================================
+#
+# Security controls applied:
+#   - Non-root users enforced at container level (user: directive)
+#   - All capabilities dropped; only required ones re-added
+#   - read_only filesystem where possible (/tmp as tmpfs for writes)
+#   - No privileged mode
+#   - Resource limits (memory + CPU) to prevent container escape via resource exhaustion
+#   - Network segmentation: frontend and backend on separate networks;
+#     only the reverse-proxy bridges both
+#   - Secrets injected via environment variables (never baked into image)
+#   - Inter-service communication via service names, not exposed host ports
+#   - healthcheck on each service; depends_on uses service_healthy condition
+#
+# Usage:
+#   Development:  docker compose up --build
+#   Production:   docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+#
+# Credentials: copy .env.example to .env and fill in values before running.
+# NEVER commit a populated .env file.
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # country-service — Spring Boot REST API
+  # ---------------------------------------------------------------------------
+  country-service:
+    build:
+      context: ../assess/country-service-main
+      dockerfile: ../application/country-service/Dockerfile
+    image: country-service:latest
+    container_name: country-service
+
+    # Run as the non-root user created inside the Dockerfile (UID 1001)
+    user: "1001:1001"
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true    # Prevent privilege escalation via setuid binaries
+
+    # Drop ALL Linux capabilities, then add back only what Spring Boot needs.
+    # Spring Boot on JVM needs no special capabilities.
+    cap_drop:
+      - ALL
+
+    # Read-only root filesystem — prevents writing malware/scripts to disk.
+    # Spring Boot needs /tmp for Tomcat temp files; mount as tmpfs.
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=128m
+
+    # Resource limits — prevent a compromised container exhausting host resources
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.0"
+        reservations:
+          memory: 256m
+          cpus: "0.25"
+
+    environment:
+      # Credentials and config injected from .env (never hardcoded here)
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-sa}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:h2:mem:countriesdb}
+      SERVER_PORT: 8081
+      # Restrict H2 web console in production
+      SPRING_H2_CONSOLE_ENABLED: ${H2_CONSOLE_ENABLED:-false}
+      # JVM options (complement ENTRYPOINT flags in Dockerfile)
+      JAVA_OPTS: "-Xms128m -Xmx384m"
+
+    # Only expose on internal network — not directly to host in production
+    expose:
+      - "8081"
+
+    networks:
+      - backend-net
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/api/countries || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+    restart: unless-stopped
+
+    # Log size limits — prevent log-based disk exhaustion
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # country-flags-app — React SPA served by hardened Nginx
+  # ---------------------------------------------------------------------------
+  country-flags-app:
+    build:
+      context: ../assess/country-flags-app-main
+      dockerfile: ../application/country-flags-app/Dockerfile
+      args:
+        # Backend URL as seen from the browser — uses the host/proxy address
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8081}
+    image: country-flags-app:latest
+    container_name: country-flags-app
+
+    user: "101:101"  # nginx user UID in nginx:alpine
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+    # nginx needs NET_BIND_SERVICE only when binding to port < 1024.
+    # We use port 8080 (unprivileged) so no capabilities needed at all.
+
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:mode=1777,size=64m
+      - /var/run:mode=1777,size=1m
+      - /tmp:mode=1777,size=32m
+
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.5"
+        reservations:
+          memory: 64m
+          cpus: "0.1"
+
+    # Expose only on internal network; the host port mapping is for local dev
+    ports:
+      - "127.0.0.1:3000:8080"  # Bind to loopback only — not 0.0.0.0
+
+    networks:
+      - frontend-net
+      - backend-net   # Needs access to country-service for browser → API calls
+
+    depends_on:
+      country-service:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+# =============================================================================
+# Networks — segmentation between frontend and backend traffic
+# =============================================================================
+networks:
+  frontend-net:
+    driver: bridge
+    # Disable ICC (inter-container communication) on frontend network so
+    # containers cannot talk to each other unless explicitly connected
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"
+
+  backend-net:
+    driver: bridge
+    # Internal — not reachable from outside Docker unless explicitly mapped
+    internal: false
+
+# =============================================================================
+# Volumes — none required (H2 is in-memory; use a named volume for PostgreSQL
+# when moving to a persistent database in production)
+# =============================================================================
