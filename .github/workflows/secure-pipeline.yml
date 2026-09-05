@@ -336,13 +336,18 @@ jobs:
       - name: OWASP Dependency-Check
         id: owasp
         run: |
+          # Produce both JSON (machine) and HTML (human) reports.
+          # Suppression file documents triaged/accepted findings (see
+          # owasp-suppressions.xml — each entry has a justification).
+          # NVD API key (optional secret) dramatically speeds up the DB update.
           mvn org.owasp:dependency-check-maven:check \
             -DfailBuildOnCVSS=7 \
-            -Dformat=JSON \
+            -Dformats=JSON,HTML \
             -DoutputDirectory=../../${{ env.REPORTS_DIR }} \
-            -DsuppressionFile="" \
+            -DsuppressionFile=owasp-suppressions.xml \
+            -DnvdApiKey=${NVD_API_KEY:-} \
             --no-transfer-progress \
-            -DnvdApiDelay=4000 \
+            -DnvdApiDelay=6000 \
             || echo "owasp_failed=true" >> $GITHUB_OUTPUT
         continue-on-error: true
         env:
@@ -356,9 +361,11 @@ jobs:
         id: semgrep_java
         run: |
           pip install semgrep --quiet
+          # Use valid Semgrep registry rulesets. Note: `p/spring` does not exist
+          # (returns HTTP 404); the correct Spring ruleset is `p/spring-security`.
           semgrep \
             --config=p/java \
-            --config=p/spring \
+            --config=p/spring-security \
             --config=p/secrets \
             --json \
             --output ../../${{ env.REPORTS_DIR }}/semgrep-java.json \
@@ -394,6 +401,7 @@ jobs:
           name: backend-security-reports
           path: |
             ${{ env.REPORTS_DIR }}/dependency-check-report.json
+            ${{ env.REPORTS_DIR }}/dependency-check-report.html
             ${{ env.REPORTS_DIR }}/semgrep-java.json
           retention-days: 30
 
