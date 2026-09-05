@@ -10,6 +10,26 @@ The provided frontend is a **Create React App (CRA)** project built with
 `react-scripts@5.0.1`. A full `npm audit` reports ~36 HIGH/CRITICAL advisories.
 Investigating them shows they fall into two very different risk categories.
 
+### Root cause of the initial "production" CRITICALs
+
+CRA's default `package.json` places **`react-scripts` under `dependencies`**, not
+`devDependencies`. Because `react-scripts` is only used by the `build`/`start`/`test`
+scripts (it is never imported into the shipped browser bundle), this
+misclassification caused its entire build/dev-server toolchain — including the
+CRITICAL advisories in `form-data`, `shell-quote`, and `websocket-driver` — to leak
+into the `npm audit --omit=dev` "production" scan.
+
+**Fix applied:** `react-scripts` and the test-only `@testing-library/*` packages were
+moved to `devDependencies` where they belong. This makes `--omit=dev` reflect the
+*real* runtime dependency tree (`react`, `react-dom`, `react-router-dom`, `axios`,
+`@mui/material`, `@emotion/*`, `web-vitals`), which contains no CRITICAL vulns.
+
+### Runtime dependency fixes applied
+
+- **`axios` 0.27.2 → 1.7.9** — remediates SSRF/credential-leak CVEs. API-compatible.
+- **`react-router-dom` 6.30.0 → 6.30.1** — remediates a HIGH XSS-via-open-redirect
+  advisory in the transitive `@remix-run/router`.
+
 ## Risk-Based Gate Policy
 
 The pipeline runs **two** npm audits:
@@ -65,10 +85,18 @@ Tracked in `docs/architecture-design.md` (Phase 2):
 
 ## Changes Already Made
 
-- **Removed `codecov@3.8.2`** from `devDependencies`. It was deprecated, unused,
-  and the source of the license-check flag. Coverage is handled by JaCoCo
-  (backend) and can use GitHub's native coverage tooling (frontend) instead.
-- Removed the now-unused `istanbul-lib-coverage` dev dependency it pulled in.
+- **Removed `codecov@3.8.2`** and its `istanbul-lib-coverage` companion from
+  `devDependencies` — deprecated and unused. Coverage is handled by JaCoCo
+  (backend) and can use GitHub's native tooling (frontend).
+- **Reclassified `react-scripts`, `@testing-library/dom`, `@testing-library/user-event`**
+  from `dependencies` to `devDependencies`. CRA misplaces `react-scripts` in
+  `dependencies` by default; it is a build/test tool, not a runtime dependency.
+  This is what cleared the 3 production CRITICALs (`form-data`, `shell-quote`,
+  `websocket-driver`), all of which are `react-scripts` build-tooling transitives.
+- **Upgraded `axios` 0.27.2 → 1.7.9** and **`react-router-dom` 6.30.0 → 6.30.1** to
+  remediate genuine runtime CVEs.
+- **Fixed the license checker** to treat dual "X OR Y" licenses (e.g. `node-forge`'s
+  `BSD-3-Clause OR GPL-2.0`) as compliant, since a permissive option can be chosen.
 
 ## How to Reproduce Locally
 

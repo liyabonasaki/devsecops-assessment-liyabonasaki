@@ -246,19 +246,33 @@ jobs:
       - name: License compliance scan
         id: license_check
         run: |
-          license-checker --json --out ../../${{ env.REPORTS_DIR }}/frontend-licenses.json || true
-          # Flag any GPL/AGPL licenses
+          # Scan production dependencies only; a copyleft license in a build/dev
+          # tool does not create a distribution obligation for the shipped app.
+          license-checker --production --json \
+            --out ../../${{ env.REPORTS_DIR }}/frontend-licenses.json || true
           VIOLATIONS=$(python3 -c "
-          import json, sys
+          import json, re
           try:
-            d=json.load(open('../../${{ env.REPORTS_DIR }}/frontend-licenses.json'))
-            blocked=['GPL','AGPL','LGPL','CC-BY-NC']
-            found=[k for k,v in d.items() if any(b in str(v.get('licenses','')) for b in blocked)]
-            print(len(found))
-          except: print(0)
+            d = json.load(open('../../${{ env.REPORTS_DIR }}/frontend-licenses.json'))
+            blocked = ['GPL', 'AGPL', 'LGPL', 'CC-BY-NC']
+            violations = []
+            for pkg, info in d.items():
+              lic = str(info.get('licenses', ''))
+              # Dual licenses like '(BSD-3-Clause OR GPL-2.0)' are NOT violations:
+              # a permissive option can be chosen. Only flag when EVERY option is
+              # copyleft, or the license is a single copyleft license.
+              options = [o.strip(' ()') for o in re.split(r'\bOR\b', lic)]
+              def is_blocked(o):
+                return any(b in o for b in blocked)
+              # Violation only if all options are copyleft (no permissive escape)
+              if options and all(is_blocked(o) for o in options):
+                violations.append(pkg)
+            print(len(violations))
+          except Exception:
+            print(0)
           ")
           echo "license_violations=$VIOLATIONS" >> $GITHUB_OUTPUT
-          echo "License violations: $VIOLATIONS"
+          echo "Production license violations (no permissive option): $VIOLATIONS"
         continue-on-error: true
 
       - name: Write frontend security summary
