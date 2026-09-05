@@ -123,6 +123,7 @@ prerequisites.
 | **Hardcoded H2 password** in `application.properties` was flagged by our own scanner (a real finding in the provided source) | Remediated by switching to environment-variable injection: `spring.datasource.password=${DB_PASSWORD:}`. Demonstrates the scanner works *and* that the finding was fixed. |
 | Secret scanner blocked the pipeline on its own test fixtures and its own output report | Added an `--exclude` option (used for `scripts/secret-detection/tests`) and added `reports/` to the scanner's default skip list to prevent self-scanning |
 | **Frontend npm audit reported ~36 HIGH/CRITICAL vulns**, almost all from Create React App's build-time dependency tree (unfixable without breaking the build) | Adopted a **risk-based gate**: block only on CRITICAL vulns in *production* dependencies (what ships to users); report dev/build-tooling advisories as non-blocking warnings. Documented in `docs/frontend-audit-triage.md` with a CRA→Vite migration plan. Also removed the deprecated, unused `codecov` dependency (the license-check offender). |
+| **3 CRITICAL vulns remained in production deps** — traced to `axios@0.27.2` (SSRF / credential-leak CVEs via `follow-redirects`) | Upgraded to `axios@^1.7.9`. The app only uses `axios.get()` + `response.data`, which are unchanged across the major version, so no code changes were needed. This *remediates* the finding rather than suppressing it. |
 
 ---
 
@@ -154,6 +155,8 @@ prerequisites.
     7. Replaced the hardcoded H2 password with `${DB_PASSWORD:}` env-var injection
     8. Adopted a risk-based frontend npm-audit gate (block on production CRITICAL,
        warn on dev-tooling advisories) and removed the deprecated `codecov` dep
+    9. Upgraded `axios` 0.27.2 → 1.7.9 to remediate CRITICAL SSRF/credential-leak
+       CVEs in a production dependency (API-compatible, no source change)
   - Every code/build fix was verified by re-running the relevant build/test locally
     before commit. The npm-audit policy change could not be run locally (no Node.js
     on the dev machine) and is validated by the pipeline itself.

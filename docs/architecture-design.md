@@ -36,7 +36,7 @@ A structured review of the provided source code reveals the following issues, or
 | 6 | H2 in-memory DB — data lost on restart, no persistence | `application.properties` | MEDIUM | 📋 Phase 2 (PostgreSQL) |
 | 7 | No authentication on API endpoints | `CountryController.java` | MEDIUM | 📋 Phase 2 (JWT) |
 | 8 | External API call on startup, no timeout/retry config | `DataLoader.java` | LOW | 📋 Phase 3 |
-| 9 | `axios@0.27.2` — outdated with known CVEs | `package.json` | HIGH | 📋 Phase 1 backlog |
+| 9 | `axios@0.27.2` — outdated with CRITICAL CVEs (SSRF, credential leak via follow-redirects) | `package.json` | HIGH | ✅ Fixed — upgraded to `axios@^1.7.9` (API-compatible, no code change) |
 | 10 | No rate limiting or request size limits | Both apps | MEDIUM | 📋 Phase 2 |
 | 11 | No structured logging or audit trail | Both apps | MEDIUM | 📋 Phase 2 |
 | 12 | No container images — no hardening | Neither app | HIGH | ✅ Fixed — hardened multi-stage Dockerfiles (Block 3) |
