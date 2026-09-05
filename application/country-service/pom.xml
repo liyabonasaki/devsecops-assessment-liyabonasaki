@@ -5,7 +5,14 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.3</version>
+        <!--
+          Bumped from 3.4.3 to 3.5.11 (latest actively-maintained patch). This
+          pulls in patched embedded Tomcat and Spring Security 6.5.x that remediate
+          the CRITICAL/HIGH CVEs Trivy flagged in the container image (tomcat-coyote
+          auth bypass / request smuggling, spring-security authorization bypass and
+          unwritten-HTTP-headers). Tomcat is additionally pinned to 10.1.59 below.
+        -->
+        <version>3.5.11</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>org.bongz</groupId>
@@ -30,6 +37,13 @@
         <java.version>17</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
+        <!--
+          Pin the embedded Tomcat to a patched release. Spring Boot's BOM exposes
+          the <tomcat.version> property for exactly this purpose. 10.1.59 fixes the
+          CRITICAL security-constraint-bypass and auth-bypass CVEs (affected
+          10.1.x <= 10.1.57). Spring Security is patched by the Boot 3.5.x parent.
+        -->
+        <tomcat.version>10.1.59</tomcat.version>
     </properties>
     <dependencies>
         <dependency>

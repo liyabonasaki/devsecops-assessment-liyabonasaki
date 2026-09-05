@@ -31,7 +31,7 @@ A structured review of the provided source code reveals the following issues, or
 | 1 | Hardcoded DB password (`password`) | `application.properties` | HIGH | ✅ Fixed — now `${DB_PASSWORD}` env-var injection |
 | 2 | H2 console enabled by default | `application.properties` | MEDIUM | ✅ Fixed — now `${H2_CONSOLE_ENABLED:false}` |
 | 3 | CORS allows all headers (`allowedHeaders("*")`) | `CorsConfig.java` | MEDIUM | 📋 Phase 1 backlog |
-| 4 | Spring Security version mismatch (2.7.0 pinned in Boot 3 project) | `pom.xml` | HIGH | 📋 Phase 1 backlog |
+| 4 | Spring Security version mismatch (2.7.0 pinned in Boot 3 project) | `pom.xml` | HIGH | ✅ Fixed — removed pin; bumped Boot to 3.5.11 (Spring Security 6.5.8) |
 | 5 | No HTTPS — all traffic in cleartext | Both apps | CRITICAL | 📋 Phase 2 (Nginx TLS) |
 | 6 | H2 in-memory DB — data lost on restart, no persistence | `application.properties` | MEDIUM | 📋 Phase 2 (PostgreSQL) |
 | 7 | No authentication on API endpoints | `CountryController.java` | MEDIUM | 📋 Phase 2 (JWT) |
@@ -42,6 +42,7 @@ A structured review of the provided source code reveals the following issues, or
 | 12 | No container images — no hardening | Neither app | HIGH | ✅ Fixed — hardened multi-stage Dockerfiles (Block 3) |
 | 13 | **Build defect**: source uses Java records but `pom.xml` targets Java 11 (records need 16+) | `pom.xml` + DTOs | HIGH | ✅ Fixed — bumped to Java 17 LTS |
 | 14 | **Test defect**: security starter causes `@WebMvcTest` controller tests to fail with 401 | `CountryControllerTest.java` | MEDIUM | ✅ Fixed — `@AutoConfigureMockMvc(addFilters=false)` |
+| 15 | **Container CVEs**: 8 CRITICAL in bundled Tomcat + Spring Security (via old Boot 3.4.3 BOM) | Spring Boot fat JAR | CRITICAL | ✅ Fixed — Boot 3.5.11 + pinned Tomcat 10.1.59 (Spring Security 6.5.8) |
 
 ### 1.3 What's Already Good
 
