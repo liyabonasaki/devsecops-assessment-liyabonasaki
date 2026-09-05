@@ -50,11 +50,19 @@ Push / PR
 - **Quality gate**: `EXIT 1` on any HIGH or CRITICAL finding → blocks entire pipeline
 - **Why first**: Fastest check; no point running expensive scans if secrets are already exposed
 
-### Scanner 2: npm Dependency Audit (Job 2)
-- **Tool**: `npm audit --audit-level=high`
+### Scanner 2: npm Dependency Audit (Job 2) — Risk-Based
+- **Tool**: `npm audit`, run twice for a risk-appropriate gate
 - **What it catches**: Known CVEs in frontend JavaScript dependencies
-- **Quality gate**: Fails on HIGH or CRITICAL vulnerability count > 0
-- **Output**: `reports/npm-audit.json`
+- **Quality gate**:
+  - **Blocking**: `npm audit --omit=dev --audit-level=critical` — fails on CRITICAL
+    vulnerabilities in *production* dependencies (those that ship to the browser)
+  - **Informational**: `npm audit --audit-level=high` — full tree incl. dev/build
+    tooling; reported for visibility but does not block
+- **Why**: The provided app uses Create React App, whose build-time tree carries many
+  unfixable advisories that never reach the browser bundle. Blocking on those would
+  stop delivery without reducing user-facing risk. Full rationale and remediation
+  plan in `docs/frontend-audit-triage.md`.
+- **Output**: `reports/npm-audit.json` (full), `reports/npm-audit-prod.json` (prod-only)
 
 ### Scanner 3: Semgrep SAST (Jobs 2 & 3)
 - **Tool**: Semgrep with `p/javascript`, `p/react`, `p/java`, `p/spring`, `p/secrets` rulesets
