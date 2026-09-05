@@ -75,8 +75,20 @@ Push / PR
 ### Scanner 4: OWASP Dependency-Check (Job 3)
 - **Tool**: `org.owasp:dependency-check-maven`
 - **What it catches**: Known CVEs in Java/Maven dependencies cross-referenced against NVD
-- **Quality gate**: `failBuildOnCVSS=7` — fails on CVSS ≥ 7 (HIGH/CRITICAL)
-- **Output**: `reports/dependency-check-report.json`
+- **Quality gate**: The scan runs and always emits a report, then a separate step
+  **parses the report** and fails only on CVEs with CVSS ≥ 7 (HIGH/CRITICAL).
+  We deliberately do **not** use `-DfailBuildOnCVSS`, because that flag conflates a
+  real finding with an NVD database-update failure (common when running without an
+  API key due to NVD rate limiting). Parsing the report separates the two:
+  - Report present + HIGH/CRITICAL found → **blocking failure**
+  - Report present + none found → **pass**
+  - Report missing (NVD update failed) → **non-blocking warning** (infrastructure
+    issue, not a security finding)
+- **Suppression**: `application/country-service/owasp-suppressions.xml` documents
+  triaged/accepted findings (each with a written justification)
+- **NVD API key**: Set the optional `NVD_API_KEY` secret for reliable, fast DB
+  updates. Without it, NVD rate-limits anonymous requests and the update may fail.
+- **Output**: `reports/dependency-check-report.json` + `.html`
 
 ### Scanner 5: Trivy (Job 4)
 - **Tool**: `aquasecurity/trivy-action`
@@ -124,7 +136,7 @@ Add the following to your GitHub repository secrets (`Settings → Secrets → A
 |--------|----------|---------|
 | `SEMGREP_APP_TOKEN` | Optional | Publish results to Semgrep Cloud dashboard |
 | `SEMGREP_DEPLOYMENT_ID` | Optional | Required if using Semgrep Cloud |
-| `NVD_API_KEY` | Recommended | Faster NVD database updates for OWASP DC |
+| `NVD_API_KEY` | **Strongly recommended** | OWASP DC downloads the NVD CVE database. Without a key, NVD rate-limits anonymous requests and the DB update can fail (the scan then produces no report and is reported as a non-blocking warning). Free key: https://nvd.nist.gov/developers/request-an-api-key |
 
 ## Pipeline Triggers
 

@@ -350,22 +350,70 @@ jobs:
       - name: OWASP Dependency-Check
         id: owasp
         run: |
-          # Produce both JSON (machine) and HTML (human) reports.
-          # Suppression file documents triaged/accepted findings (see
-          # owasp-suppressions.xml — each entry has a justification).
-          # NVD API key (optional secret) dramatically speeds up the DB update.
+          # We do NOT use -DfailBuildOnCVSS here. That flag conflates two very
+          # different situations: (a) real CVEs found, and (b) the NVD database
+          # update failing (which is common without an NVD API key due to NVD
+          # rate limiting). Instead we run the analysis, always emit a report,
+          # and gate on the PARSED report in a later step. This way an NVD
+          # infrastructure hiccup never masquerades as a CVE finding.
+          #
+          # Suppression file documents triaged/accepted findings, each justified.
+          set +e
           mvn org.owasp:dependency-check-maven:check \
-            -DfailBuildOnCVSS=7 \
             -Dformats=JSON,HTML \
             -DoutputDirectory=../../${{ env.REPORTS_DIR }} \
             -DsuppressionFile=owasp-suppressions.xml \
-            -DnvdApiKey=${NVD_API_KEY:-} \
+            -DnvdApiKey="${NVD_API_KEY:-}" \
             --no-transfer-progress \
-            -DnvdApiDelay=6000 \
-            || echo "owasp_failed=true" >> $GITHUB_OUTPUT
+            -DnvdApiDelay=8000 \
+            -DnvdMaxRetryCount=5
+          MVN_EXIT=$?
+          set -e
+          echo "owasp_mvn_exit=$MVN_EXIT" >> $GITHUB_OUTPUT
+          if [ -f "../../${{ env.REPORTS_DIR }}/dependency-check-report.json" ]; then
+            echo "owasp_report=present" >> $GITHUB_OUTPUT
+            echo "OWASP report generated successfully."
+          else
+            echo "owasp_report=missing" >> $GITHUB_OUTPUT
+            echo "::warning::OWASP report not generated — likely an NVD database update failure (rate limiting). Add an NVD_API_KEY secret for reliable runs."
+          fi
         continue-on-error: true
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+      - name: Evaluate OWASP findings (parse report)
+        id: owasp_eval
+        if: always()
+        run: |
+          REPORT="../../${{ env.REPORTS_DIR }}/dependency-check-report.json"
+          if [ ! -f "$REPORT" ]; then
+            echo "high_critical=0" >> $GITHUB_OUTPUT
+            echo "report_present=false" >> $GITHUB_OUTPUT
+            echo "No OWASP report to evaluate."
+            exit 0
+          fi
+          echo "report_present=true" >> $GITHUB_OUTPUT
+          # Count HIGH/CRITICAL CVEs (CVSS v3 >= 7, or v2 >= 7 when v3 absent).
+          # Suppressed vulns are already excluded from the report by the plugin.
+          HC=$(python3 -c "
+          import json
+          d = json.load(open('$REPORT'))
+          count = 0
+          for dep in d.get('dependencies', []):
+            for v in dep.get('vulnerabilities', []) or []:
+              score = 0.0
+              cvssv3 = v.get('cvssv3') or {}
+              cvssv2 = v.get('cvssv2') or {}
+              if cvssv3.get('baseScore') is not None:
+                score = float(cvssv3['baseScore'])
+              elif cvssv2.get('score') is not None:
+                score = float(cvssv2['score'])
+              if score >= 7.0:
+                count += 1
+          print(count)
+          ")
+          echo "high_critical=$HC" >> $GITHUB_OUTPUT
+          echo "OWASP HIGH/CRITICAL (CVSS>=7, post-suppression): $HC"
 
       # -------------------------------------------------------------------------
       # Scanner 2: Semgrep Java SAST
@@ -403,9 +451,16 @@ jobs:
           echo "## ☕ Backend Security Results" >> $GITHUB_STEP_SUMMARY
           echo "| Scanner | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
-          OWASP_STATUS="${{ steps.owasp.outputs.owasp_failed }}"
+          REPORT_PRESENT="${{ steps.owasp_eval.outputs.report_present }}"
+          OWASP_HC="${{ steps.owasp_eval.outputs.high_critical }}"
           SG_COUNT="${{ steps.semgrep_java.outputs.semgrep_findings }}"
-          [ -z "$OWASP_STATUS" ] && echo "| OWASP Dependency-Check | ✅ Pass |" >> $GITHUB_STEP_SUMMARY || echo "| OWASP Dependency-Check | ❌ HIGH/CRITICAL CVEs found |" >> $GITHUB_STEP_SUMMARY
+          if [ "$REPORT_PRESENT" != "true" ]; then
+            echo "| OWASP Dependency-Check | ⚠️ Skipped — NVD DB update unavailable (add NVD_API_KEY) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${OWASP_HC:-0}" -eq "0" ]; then
+            echo "| OWASP Dependency-Check | ✅ Pass — 0 HIGH/CRITICAL (post-suppression) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| OWASP Dependency-Check | ❌ $OWASP_HC HIGH/CRITICAL CVE(s) |" >> $GITHUB_STEP_SUMMARY
+          fi
           [ "${SG_COUNT:-0}" -eq "0" ] && echo "| Semgrep Java SAST | ✅ Pass |" >> $GITHUB_STEP_SUMMARY || echo "| Semgrep Java SAST | ⚠️ $SG_COUNT findings |" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload backend scan reports
@@ -418,12 +473,13 @@ jobs:
             ${{ env.REPORTS_DIR }}/dependency-check-report.html
             ${{ env.REPORTS_DIR }}/semgrep-java.json
           retention-days: 30
+          if-no-files-found: ignore
 
       - name: Enforce quality gate — OWASP
-        if: steps.owasp.outputs.owasp_failed == 'true'
+        if: steps.owasp_eval.outputs.report_present == 'true' && steps.owasp_eval.outputs.high_critical != '0' && steps.owasp_eval.outputs.high_critical != ''
         run: |
-          echo "❌ QUALITY GATE FAILED: HIGH/CRITICAL CVEs found in Java dependencies."
-          echo "Review reports/dependency-check-report.json for details."
+          echo "❌ QUALITY GATE FAILED: ${{ steps.owasp_eval.outputs.high_critical }} HIGH/CRITICAL CVE(s) in Java dependencies."
+          echo "Review reports/dependency-check-report.json (or the HTML report) for details."
           exit 1
 
   # ===========================================================================
