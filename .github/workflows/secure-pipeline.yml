@@ -28,7 +28,7 @@ on:
   workflow_dispatch: # Allow manual trigger
 
 env:
-  JAVA_VERSION: "11"
+  JAVA_VERSION: "17"
   NODE_VERSION: "18"
   REPORTS_DIR: reports
 
@@ -63,10 +63,13 @@ jobs:
       - name: Run Secret Detection Engine
         id: secret_scan
         run: |
+          # Exclude the scanner's own test fixtures — they contain intentional
+          # "dirty" samples used to validate detection, not real secrets.
           python scripts/secret-detection/secret_detector.py \
             --path . \
             --format json \
             --severity HIGH \
+            --exclude scripts/secret-detection/tests \
             --output ${{ env.REPORTS_DIR }}/secret-scan.json
           echo "exit_code=$?" >> $GITHUB_OUTPUT
         # continue-on-error so we can upload artifacts even on failure

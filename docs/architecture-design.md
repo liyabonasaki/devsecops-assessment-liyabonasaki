@@ -15,7 +15,7 @@ The provided application is a two-tier web stack:
 ```
 ┌─────────────────────────┐        ┌──────────────────────────────┐
 │  country-flags-app       │        │  country-service              │
-│  React 18 SPA            │───────▶│  Spring Boot 3 / Java 11     │
+│  React 18 SPA            │───────▶│  Spring Boot 3 / Java 17     │
 │  Port 3000               │  HTTP  │  Port 8081                   │
 │  npm / react-scripts     │        │  H2 in-memory DB             │
 └─────────────────────────┘        │  External: restcountries.com  │
@@ -26,20 +26,22 @@ The provided application is a two-tier web stack:
 
 A structured review of the provided source code reveals the following issues, ordered by risk:
 
-| # | Gap | Location | Risk |
-|---|-----|----------|------|
-| 1 | Hardcoded DB password (`password`) | `application.properties` | HIGH |
-| 2 | H2 console enabled in dev profile | `application.properties` | MEDIUM |
-| 3 | CORS allows all headers (`allowedHeaders("*")`) | `CorsConfig.java` | MEDIUM |
-| 4 | Spring Security version mismatch (2.7.0 pinned in Boot 3 project) | `pom.xml` | HIGH |
-| 5 | No HTTPS — all traffic in cleartext | Both apps | CRITICAL |
-| 6 | H2 in-memory DB — data lost on restart, no persistence | `application.properties` | MEDIUM |
-| 7 | No authentication on API endpoints | `CountryController.java` | MEDIUM |
-| 8 | External API call on startup, no timeout/retry config | `DataLoader.java` | LOW |
-| 9 | `axios@0.27.2` — outdated with known CVEs | `package.json` | HIGH |
-| 10 | No rate limiting or request size limits | Both apps | MEDIUM |
-| 11 | No structured logging or audit trail | Both apps | MEDIUM |
-| 12 | No container images — no hardening | Neither app | HIGH |
+| # | Gap | Location | Risk | Status |
+|---|-----|----------|------|--------|
+| 1 | Hardcoded DB password (`password`) | `application.properties` | HIGH | ✅ Fixed — now `${DB_PASSWORD}` env-var injection |
+| 2 | H2 console enabled by default | `application.properties` | MEDIUM | ✅ Fixed — now `${H2_CONSOLE_ENABLED:false}` |
+| 3 | CORS allows all headers (`allowedHeaders("*")`) | `CorsConfig.java` | MEDIUM | 📋 Phase 1 backlog |
+| 4 | Spring Security version mismatch (2.7.0 pinned in Boot 3 project) | `pom.xml` | HIGH | 📋 Phase 1 backlog |
+| 5 | No HTTPS — all traffic in cleartext | Both apps | CRITICAL | 📋 Phase 2 (Nginx TLS) |
+| 6 | H2 in-memory DB — data lost on restart, no persistence | `application.properties` | MEDIUM | 📋 Phase 2 (PostgreSQL) |
+| 7 | No authentication on API endpoints | `CountryController.java` | MEDIUM | 📋 Phase 2 (JWT) |
+| 8 | External API call on startup, no timeout/retry config | `DataLoader.java` | LOW | 📋 Phase 3 |
+| 9 | `axios@0.27.2` — outdated with known CVEs | `package.json` | HIGH | 📋 Phase 1 backlog |
+| 10 | No rate limiting or request size limits | Both apps | MEDIUM | 📋 Phase 2 |
+| 11 | No structured logging or audit trail | Both apps | MEDIUM | 📋 Phase 2 |
+| 12 | No container images — no hardening | Neither app | HIGH | ✅ Fixed — hardened multi-stage Dockerfiles (Block 3) |
+| 13 | **Build defect**: source uses Java records but `pom.xml` targets Java 11 (records need 16+) | `pom.xml` + DTOs | HIGH | ✅ Fixed — bumped to Java 17 LTS |
+| 14 | **Test defect**: security starter causes `@WebMvcTest` controller tests to fail with 401 | `CountryControllerTest.java` | MEDIUM | ✅ Fixed — `@AutoConfigureMockMvc(addFilters=false)` |
 
 ### 1.3 What's Already Good
 

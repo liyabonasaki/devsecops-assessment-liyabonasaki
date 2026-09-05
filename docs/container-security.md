@@ -10,7 +10,7 @@ Both images follow multi-stage build patterns and apply defence-in-depth at ever
 ```
 application/
 ├── country-service/
-│   └── Dockerfile          ← Spring Boot (Java 11) — 2-stage build
+│   └── Dockerfile          ← Spring Boot (Java 17) — 2-stage build
 └── country-flags-app/
     ├── Dockerfile           ← React 18 + Nginx — 2-stage build
     └── nginx.conf           ← Hardened Nginx configuration
@@ -26,8 +26,8 @@ infrastructure/
 
 | Stage | Image | Purpose | Ships to production? |
 |-------|-------|---------|---------------------|
-| builder (backend) | `eclipse-temurin:11-jdk-alpine` | Compile JAR | ❌ No |
-| runtime (backend) | `eclipse-temurin:11-jre-alpine` | Run JAR | ✅ Yes |
+| builder (backend) | `eclipse-temurin:17-jdk-alpine` | Compile JAR | ❌ No |
+| runtime (backend) | `eclipse-temurin:17-jre-alpine` | Run JAR | ✅ Yes |
 | builder (frontend) | `node:18-alpine` | `npm build` | ❌ No |
 | runtime (frontend) | `nginx:1.27-alpine` | Serve static files | ✅ Yes |
 
@@ -179,8 +179,8 @@ trivy config . --severity CRITICAL,HIGH
 
 | Image | Why chosen |
 |-------|-----------|
-| `eclipse-temurin:11-jdk-alpine` | Adoptium LTS, smaller than Debian-based, actively patched |
-| `eclipse-temurin:11-jre-alpine` | JRE only — removes compiler, jshell, javac from final image |
+| `eclipse-temurin:17-jdk-alpine` | Adoptium LTS (Java 17), smaller than Debian-based, actively patched |
+| `eclipse-temurin:17-jre-alpine` | JRE only — removes compiler, jshell, javac from final image |
 | `node:18-alpine` | LTS Node, Alpine reduces CVE surface vs Debian node |
 | `nginx:1.27-alpine` | Current stable, Alpine base, minimal footprint (~40 MB) |
 

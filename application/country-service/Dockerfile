@@ -1,6 +1,6 @@
 # =============================================================================
 # country-service — Secure Multi-Stage Dockerfile
-# Spring Boot 3 / Java 11 backend
+# Spring Boot 3 / Java 17 (LTS) backend
 # =============================================================================
 #
 # Security decisions:
@@ -20,7 +20,7 @@
 # =============================================================================
 
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
-FROM eclipse-temurin:11-jdk-alpine AS builder
+FROM eclipse-temurin:17-jdk-alpine AS builder
 
 LABEL stage="builder"
 
@@ -45,7 +45,7 @@ RUN ./mvnw package \
         --no-transfer-progress
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM eclipse-temurin:11-jre-alpine AS runtime
+FROM eclipse-temurin:17-jre-alpine AS runtime
 
 # Metadata
 LABEL maintainer="liyabona.saki" \
