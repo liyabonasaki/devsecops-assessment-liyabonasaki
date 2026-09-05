@@ -127,7 +127,8 @@ prerequisites.
 | Genuine runtime CVEs in production deps | Upgraded `axios@0.27.2 → 1.7.9` (SSRF/credential-leak) and `react-router-dom@6.30.0 → 6.30.1` (XSS via open redirect in `@remix-run/router`). App code unchanged. |
 | License check false positive on `node-forge` (`BSD-3-Clause OR GPL-2.0`) | Fixed the checker to treat dual "X OR Y" licenses as compliant when a permissive option exists, and scoped it to production deps only. |
 | **OWASP DC failing on NVD update, mislabeled as CVEs found** | Rewrote the gate to run the scan, always emit a report, then parse it — failing only on real CVSS≥7 findings. A missing report (NVD rate-limit) is now a non-blocking warning. Added a documented suppression file for accepted findings. |
-| **8 CRITICAL container CVEs** in the backend image — bundled Tomcat + Spring Security from the old Boot 3.4.3 BOM | Bumped Spring Boot 3.4.3 → **3.5.11** and pinned embedded **Tomcat 10.1.59** via `<tomcat.version>`. Resolves to Tomcat 10.1.59 + Spring Security 6.5.8, clearing all 8 CRITICALs at source. Verified 8/8 tests still pass. |
+| **8 CRITICAL container CVEs** in the backend image — bundled Tomcat + Spring Security from the old Boot 3.4.3 BOM | Bumped Spring Boot 3.4.3 → **3.5.11** and pinned **Tomcat 10.1.59** via `<tomcat.version>`. A follow-up scan showed the Spring Security "unwritten HTTP headers" CVE affects ≤ 6.5.8 (Boot 3.5.11's default), so also pinned **`spring-security.version=6.5.11`**. Result: 0 CRITICAL. Verified 8/8 tests pass. |
+| Residual container **HIGHs** (OpenSSL/libssl in the Alpine base image, transitive jackson) | Non-blocking (gate is CRITICAL-only) and filtered by Trivy `ignore-unfixed`. Documented in `docs/container-security.md` — base-image OS CVEs clear on rebuild once upstream Alpine patches. |
 
 ---
 
@@ -168,9 +169,10 @@ prerequisites.
        scoped it to production dependencies
    12. Made the OWASP Dependency-Check gate robust (parse report; don't fail on NVD
        DB-update errors) and added a documented suppression file
-   13. Bumped Spring Boot 3.4.3 → 3.5.11 and pinned Tomcat 10.1.59 to clear 8
-       CRITICAL container CVEs (Tomcat + Spring Security); resolves to Tomcat
-       10.1.59 + Spring Security 6.5.8, verified with 8/8 tests passing
+   13. Bumped Spring Boot 3.4.3 → 3.5.11 and pinned Tomcat 10.1.59 + Spring
+       Security 6.5.11 to clear all container CRITICAL CVEs (Tomcat auth bypass,
+       Spring Security policy bypass); resolves to Tomcat 10.1.59 + Spring
+       Security 6.5.11, verified with 8/8 tests passing
   - Every code/build fix was verified by re-running the relevant build/test locally
     before commit. The npm-audit policy change could not be run locally (no Node.js
     on the dev machine) and is validated by the pipeline itself.

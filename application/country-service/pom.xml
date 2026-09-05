@@ -38,12 +38,16 @@
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <!--
-          Pin the embedded Tomcat to a patched release. Spring Boot's BOM exposes
-          the <tomcat.version> property for exactly this purpose. 10.1.59 fixes the
-          CRITICAL security-constraint-bypass and auth-bypass CVEs (affected
-          10.1.x <= 10.1.57). Spring Security is patched by the Boot 3.5.x parent.
+          Pin patched dependency versions via the properties Spring Boot's BOM
+          exposes for this purpose:
+          - Tomcat 10.1.59 fixes the CRITICAL security-constraint-bypass /
+            auth-bypass CVEs (affected 10.1.x <= 10.1.57).
+          - Spring Security 6.5.11 fixes the CRITICAL "unwritten HTTP headers"
+            policy-bypass CVE. The Boot 3.5.11 default (6.5.8) is still in the
+            affected range (6.5.0 through 6.5.8), so we bump to 6.5.11.
         -->
         <tomcat.version>10.1.59</tomcat.version>
+        <spring-security.version>6.5.11</spring-security.version>
     </properties>
     <dependencies>
         <dependency>

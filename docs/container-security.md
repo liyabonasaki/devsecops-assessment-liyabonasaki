@@ -175,6 +175,38 @@ trivy image country-flags-app:latest --severity CRITICAL,HIGH
 trivy config . --severity CRITICAL,HIGH
 ```
 
+## Vulnerability Remediation & Residual Findings
+
+The container gate **blocks on CRITICAL** (HIGH is reported as a warning). Trivy runs
+with `ignore-unfixed: true`, so only vulnerabilities with an available fix are counted.
+
+### CRITICALs — all remediated
+
+The initial scan flagged 8 CRITICALs, all in the backend image's bundled Java
+dependencies (the frontend image and the Dockerfile config scan were clean):
+
+| Component | CVE class | Fix |
+|-----------|-----------|-----|
+| Embedded Tomcat (`tomcat-coyote`) | Auth bypass, security-constraint bypass | Pinned `tomcat.version=10.1.59` |
+| Spring Security | Authorization bypass; unwritten HTTP headers (affected ≤ 6.5.8) | Pinned `spring-security.version=6.5.11` |
+
+Both were driven by the old Spring Boot 3.4.3 BOM; the project now uses Boot 3.5.11
+with the two version overrides above. Result: **0 CRITICAL**.
+
+### Residual HIGHs — non-blocking, documented
+
+The remaining HIGH findings do not block the gate and fall into two groups:
+
+| Group | Example | Why not blocking here |
+|-------|---------|----------------------|
+| Alpine base-image OS packages | `openssl`/`libssl3` QUIC DoS (CVE-2026-14456) | Ship in `eclipse-temurin:17-jre-alpine`. The app does not run an OpenSSL QUIC server, so the DoS vector is not reachable. Cleared automatically when the base image publishes a patched Alpine build; rebuild picks it up. |
+| Transitive Java libs | `jackson-core` async-parser edge case | Managed by the Boot BOM; will clear on the next Boot patch. Not reachable via the app's simple REST endpoints. |
+
+These are tracked rather than force-fixed because (a) they are HIGH not CRITICAL,
+(b) `ignore-unfixed` already filters out anything with no upstream fix, and (c)
+base-image OS CVEs are remediated by rebuilding once the upstream Alpine package
+updates — not by application changes.
+
 ## Base Image Selection Rationale
 
 | Image | Why chosen |
