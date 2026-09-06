@@ -1,4 +1,4 @@
-﻿# Frontend Dependency Audit - Triage & Accepted Findings
+# Frontend Dependency Audit - Triage & Accepted Findings
 
 This document explains the risk-based policy the pipeline applies to `npm audit`
 findings in the `country-flags-app` frontend, and records which findings are

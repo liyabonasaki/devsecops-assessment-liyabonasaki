@@ -1,4 +1,4 @@
-﻿// BAD: JavaScript file with embedded secrets - used for testing detection
+// BAD: JavaScript file with embedded secrets - used for testing detection
 //
 // IMPORTANT: All values below are SYNTHETIC test fixtures.
 // They are structurally similar to real secret formats so our custom detector

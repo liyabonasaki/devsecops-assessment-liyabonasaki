@@ -1,4 +1,4 @@
-﻿# Block 3: Container Security
+# Block 3: Container Security
 
 ## Overview
 

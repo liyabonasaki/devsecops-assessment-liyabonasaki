@@ -1,4 +1,4 @@
-﻿# =============================================================================
+# =============================================================================
 # country-service - Secure Multi-Stage Dockerfile
 # Spring Boot 3 / Java 17 (LTS) backend
 # =============================================================================
@@ -82,4 +82,4 @@ ENTRYPOINT ["java", \
 # Healthcheck - polls the Spring Boot actuator health endpoint every 30 s.
 # Requires spring-boot-starter-actuator on the classpath (or use /api/countries).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-  CMD wget -qO- http://localhost:8081/api/countries || exit 1
+  CMD wget -qO- http://127.0.0.1:8081/api/countries || exit 1

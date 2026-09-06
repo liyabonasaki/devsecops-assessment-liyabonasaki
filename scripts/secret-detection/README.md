@@ -1,4 +1,4 @@
-﻿# Secret Detection Engine
+# Secret Detection Engine
 
 A Python-based secret scanner that detects hardcoded credentials, API keys, tokens, and
 passwords in source code and configuration files. Designed to integrate into CI/CD pipelines

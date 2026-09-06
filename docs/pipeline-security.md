@@ -1,4 +1,4 @@
-﻿# Block 2: Pipeline Security
+# Block 2: Pipeline Security
 
 ## Overview
 

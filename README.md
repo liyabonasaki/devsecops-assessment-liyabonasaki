@@ -1,4 +1,4 @@
-﻿# DevSecOps Assessment - Liyabona Saki
+# DevSecOps Assessment - Liyabona Saki
 
 **Repository:** `devsecops-assessment-liyabonasaki`  
 **Branch:** `candidate-assessment`  

@@ -1,4 +1,4 @@
-﻿# =============================================================================
+# =============================================================================
 # Secure Docker Compose - Country App Stack
 # =============================================================================
 #
@@ -74,7 +74,10 @@ services:
       # JVM options (complement ENTRYPOINT flags in Dockerfile)
       JAVA_OPTS: "-Xms128m -Xmx384m"
 
-    # Only expose on internal network - not directly to host in production
+    # Only expose on internal network - not directly to host in production.
+    # For local API testing you can temporarily add:
+    #   ports:
+    #     - "127.0.0.1:8081:8081"
     expose:
       - "8081"
 
@@ -82,7 +85,7 @@ services:
       - backend-net
 
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/api/countries || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/api/countries || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -148,7 +151,10 @@ services:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      # Use 127.0.0.1 (not localhost): inside Alpine, localhost may resolve to
+      # IPv6 ::1 first, but nginx listens on IPv4 0.0.0.0:8080, causing the
+      # healthcheck to get "connection refused" even though the app is up.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

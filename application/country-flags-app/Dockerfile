@@ -1,4 +1,4 @@
-﻿# =============================================================================
+# =============================================================================
 # country-flags-app - Secure Multi-Stage Dockerfile
 # React 18 frontend served by Nginx
 # =============================================================================
@@ -30,8 +30,12 @@ WORKDIR /app
 # Copy manifests first for dependency layer caching
 COPY package.json package-lock.json ./
 
-# ci install - uses exact versions from lock file; fails on mismatch
-RUN npm ci --prefer-offline
+# Prefer reproducible `npm ci`. If the lock file is out of sync with
+# package.json (e.g. after dependency changes that haven't been re-locked),
+# fall back to `npm install` to reconcile the lock, then continue.
+RUN npm ci --prefer-offline || \
+    (echo "package-lock.json out of sync - reconciling with npm install" && \
+     npm install --no-audit --no-fund)
 
 # Accept API URL as a build argument (no hardcoded URLs in image)
 ARG REACT_APP_API_URL=http://localhost:8081
@@ -40,7 +44,7 @@ ENV REACT_APP_API_URL=$REACT_APP_API_URL
 # Copy source and build
 COPY public/ public/
 COPY src/ src/
-COPY .babelrc babel.config.js jest.config.json ./
+COPY .babelrc babel.config.cjs jest.config.json ./
 
 RUN npm run build
 
@@ -74,7 +78,9 @@ USER nginx
 # Run on 8080 (unprivileged port - avoids needing NET_BIND_SERVICE capability)
 EXPOSE 8080
 
+# Use 127.0.0.1 (not localhost): in Alpine, localhost may resolve to IPv6 ::1
+# first, but nginx listens on IPv4, causing a false "connection refused".
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:8080/ || exit 1
+  CMD wget -qO- http://127.0.0.1:8080/health || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

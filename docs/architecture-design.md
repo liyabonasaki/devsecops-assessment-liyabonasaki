@@ -1,4 +1,4 @@
-﻿# Block 4: DevSecOps Architecture Design
+# Block 4: DevSecOps Architecture Design
 
 **Candidate:** Liyabona Saki  
 **Assessment:** DevSecOps Technical Assessment  
