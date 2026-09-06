@@ -97,17 +97,26 @@ Prevents a compromised container from exhausting host resources (DoS via CPU/mem
 ```
 Internet
     |
-    └-- host port 127.0.0.1:3000  <- loopback only, not 0.0.0.0
+    +-- host port 127.0.0.1:3000  <- frontend, loopback only, not 0.0.0.0
+    |
+    +-- host port 127.0.0.1:8081  <- backend, loopback only (local dev/testing)
             |
     country-flags-app  (frontend-net + backend-net)
             |
-    country-service    (backend-net only)
+    country-service    (backend-net)
 ```
 
-- `country-service` is never directly exposed to the host
+- Both services are published to the host on **loopback only** (`127.0.0.1`),
+  never on `0.0.0.0`, so they are reachable from this machine but not from the
+  wider network.
 - `frontend-net` has ICC (inter-container communication) disabled - containers
-  on this network cannot talk to each other laterally
-- The backend port (8081) is `expose`-only, not `ports` - invisible to the host
+  on this network cannot talk to each other laterally.
+- **Local vs production**: the backend's `127.0.0.1:8081` host mapping exists so the
+  browser-based frontend can call the API directly in this simplified local setup
+  (there is no reverse proxy routing `/api` to the backend). In a production
+  deployment the backend would sit behind the reverse proxy / API gateway and this
+  host mapping would be removed, leaving `country-service` reachable only over the
+  internal `backend-net`.
 
 ### 8. Secrets Management
 
@@ -156,7 +165,7 @@ docker compose -f infrastructure/docker-compose.yml --env-file infrastructure/.e
 
 # 3. Access
 #    Frontend: http://localhost:3000
-#    API:      http://localhost:8081/api/countries  (internal only)
+#    API:      http://localhost:8081/api/countries  (loopback-only host mapping)
 
 # 4. Stop
 docker compose -f infrastructure/docker-compose.yml down

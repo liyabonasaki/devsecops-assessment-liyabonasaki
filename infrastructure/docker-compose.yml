@@ -74,12 +74,15 @@ services:
       # JVM options (complement ENTRYPOINT flags in Dockerfile)
       JAVA_OPTS: "-Xms128m -Xmx384m"
 
-    # Only expose on internal network - not directly to host in production.
-    # For local API testing you can temporarily add:
-    #   ports:
-    #     - "127.0.0.1:8081:8081"
+    # Always available to other containers on the internal network.
     expose:
       - "8081"
+    # Published to the host on LOOPBACK ONLY (127.0.0.1), not 0.0.0.0, so the
+    # browser-based frontend can reach the API directly in this local setup.
+    # In production the backend would sit behind the reverse proxy / API gateway
+    # and this mapping would be removed (see docs/container-security.md).
+    ports:
+      - "127.0.0.1:8081:8081"
 
     networks:
       - backend-net
