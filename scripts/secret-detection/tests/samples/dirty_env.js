@@ -1,12 +1,12 @@
-// BAD: JavaScript file with embedded secrets — used for testing detection
+﻿// BAD: JavaScript file with embedded secrets - used for testing detection
 //
 // IMPORTANT: All values below are SYNTHETIC test fixtures.
 // They are structurally similar to real secret formats so our custom detector
 // can match them, but each one is deliberately altered to be non-functional:
 //   - Stripe:  uses sk_test_ prefix (test-mode, not live) with dummy chars
 //   - AWS:     uses AKIATESTONLY prefix (not a real AWS key ID prefix format)
-//   - Google:  value ends in TEST000 — not a valid key
-//   - GitHub:  value is all-zeroes — not a real token
+//   - Google:  value ends in TEST000 - not a valid key
+//   - GitHub:  value is all-zeroes - not a real token
 // GitHub push protection will not flag these as valid credentials.
 
 // BAD: hardcoded Stripe test key (test keys are not live but still a bad practice)
@@ -19,7 +19,7 @@ const awsConfig = {
 };
 
 // BAD: Google API key variable assignment with dummy value
-// AIzaSy prefix kept (required by our pattern) — trailing chars are synthetic
+// AIzaSy prefix kept (required by our pattern) - trailing chars are synthetic
 const googleApiKey = "AIzaSyFAKEVALUE0000000000000000000000000";
 
 // BAD: GitHub-style token variable (ghp_ prefix kept for pattern match;

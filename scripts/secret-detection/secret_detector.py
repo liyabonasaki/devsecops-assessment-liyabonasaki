@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Secret Detection Engine
 -----------------------
@@ -135,7 +135,7 @@ SECRET_PATTERNS = [
 ]
 
 # ---------------------------------------------------------------------------
-# False positive filter patterns — reduce noise for well-known placeholders
+# False positive filter patterns - reduce noise for well-known placeholders
 # ---------------------------------------------------------------------------
 FALSE_POSITIVE_PATTERNS = [
     r"(?i)\$\{[^}]+\}",            # ${ENV_VAR} style substitution
@@ -167,7 +167,7 @@ SCANNABLE_EXTENSIONS = {
 SKIP_DIRS = {
     ".git", "node_modules", "__pycache__", ".tox", "venv", ".venv",
     "dist", "build", "target", ".idea", ".vscode", "coverage",
-    "reports",  # scanner's own output dir — avoid self-scanning reports
+    "reports",  # scanner's own output dir - avoid self-scanning reports
 }
 
 
@@ -379,7 +379,7 @@ def format_text(result: ScanResult) -> str:
     lines.append(sep)
 
     if not result.findings:
-        lines.append("\n  ✅  No secrets detected. Scan PASSED.\n")
+        lines.append("\n  No secrets detected. Scan PASSED.\n")
     else:
         for i, f in enumerate(result.findings, 1):
             lines.append(f"\n  [{i}] {f.severity} | {f.secret_type} | Confidence: {f.confidence}%")
@@ -390,7 +390,7 @@ def format_text(result: ScanResult) -> str:
             lines.append(f"      Fix       : {f.remediation}")
 
     lines.append("\n" + sep)
-    status = "✅  PASSED" if result.passed else "❌  FAILED — secrets detected"
+    status = "PASSED" if result.passed else "FAILED - secrets detected"
     lines.append(f"  RESULT: {status}")
     lines.append(sep + "\n")
     return "\n".join(lines)
@@ -401,7 +401,7 @@ def format_text(result: ScanResult) -> str:
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(
-        description="Secret Detection Engine — scans source code for hardcoded secrets",
+        description="Secret Detection Engine - scans source code for hardcoded secrets",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

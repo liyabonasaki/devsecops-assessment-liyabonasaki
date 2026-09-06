@@ -1,25 +1,25 @@
-# =============================================================================
-# country-service — Secure Multi-Stage Dockerfile
+﻿# =============================================================================
+# country-service - Secure Multi-Stage Dockerfile
 # Spring Boot 3 / Java 17 (LTS) backend
 # =============================================================================
 #
 # Security decisions:
-#   1. Multi-stage build — build toolchain (Maven + JDK) never ships in the
+#   1. Multi-stage build - build toolchain (Maven + JDK) never ships in the
 #      final image, removing ~600 MB of attack surface.
-#   2. Eclipse Temurin (Adoptium) base — well-maintained, regularly patched,
+#   2. Eclipse Temurin (Adoptium) base - well-maintained, regularly patched,
 #      preferred over OpenJDK Docker Hub images which lag on CVE fixes.
-#   3. Non-root user (appuser:1001) — container cannot escalate privileges
+#   3. Non-root user (appuser:1001) - container cannot escalate privileges
 #      even if a CVE allows code execution.
-#   4. Read-only filesystem hint — the app only writes to /tmp (Spring tmp).
-#   5. No unnecessary packages — JRE-only final image (no compiler, no shell
+#   4. Read-only filesystem hint - the app only writes to /tmp (Spring tmp).
+#   5. No unnecessary packages - JRE-only final image (no compiler, no shell
 #      tools like curl/wget that aid lateral movement).
 #   6. COPY --chown ensures the JAR is owned by the non-root user.
-#   7. No secrets in image — DB credentials and API URLs are injected at
+#   7. No secrets in image - DB credentials and API URLs are injected at
 #      runtime via environment variables (see docker-compose.yml).
-#   8. HEALTHCHECK — lets the orchestrator detect and restart unhealthy pods.
+#   8. HEALTHCHECK - lets the orchestrator detect and restart unhealthy pods.
 # =============================================================================
 
-# ── Stage 1: Build ────────────────────────────────────────────────────────────
+# -- Stage 1: Build ------------------------------------------------------------
 FROM eclipse-temurin:17-jdk-alpine AS builder
 
 LABEL stage="builder"
@@ -44,13 +44,13 @@ RUN ./mvnw package \
         -B \
         --no-transfer-progress
 
-# ── Stage 2: Runtime ──────────────────────────────────────────────────────────
+# -- Stage 2: Runtime ----------------------------------------------------------
 FROM eclipse-temurin:17-jre-alpine AS runtime
 
 # Metadata
 LABEL maintainer="liyabona.saki" \
       org.opencontainers.image.title="country-service" \
-      org.opencontainers.image.description="Country REST API — Spring Boot" \
+      org.opencontainers.image.description="Country REST API - Spring Boot" \
       org.opencontainers.image.version="0.0.1"
 
 # Create a non-root system user + group.
@@ -59,7 +59,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup -u 1001
 
 WORKDIR /app
 
-# Copy only the fat JAR from the builder stage — nothing else
+# Copy only the fat JAR from the builder stage - nothing else
 COPY --from=builder --chown=appuser:appgroup /build/target/*.jar app.jar
 
 # Switch to non-root before any runtime operations
@@ -79,7 +79,7 @@ ENTRYPOINT ["java", \
   "-Djava.security.egd=file:/dev/./urandom", \
   "-jar", "app.jar"]
 
-# Healthcheck — polls the Spring Boot actuator health endpoint every 30 s.
+# Healthcheck - polls the Spring Boot actuator health endpoint every 30 s.
 # Requires spring-boot-starter-actuator on the classpath (or use /api/countries).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
   CMD wget -qO- http://localhost:8081/api/countries || exit 1

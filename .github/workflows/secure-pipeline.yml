@@ -1,19 +1,19 @@
-# =============================================================================
-# Secure CI/CD Pipeline — DevSecOps Assessment
+﻿# =============================================================================
+# Secure CI/CD Pipeline - DevSecOps Assessment
 # =============================================================================
 # Security scanners integrated:
-#   1. Secret Detection     — custom Python engine (Block 1)
-#   2. Dependency Audit     — npm audit (frontend) + OWASP Dependency-Check (backend)
-#   3. SAST                 — Semgrep (multi-language static analysis)
-#   4. Container Scan       — Trivy image vulnerability scan
-#   5. IaC Scan             — Trivy config scan (Dockerfile / docker-compose)
-#   6. License Check        — license-checker (frontend)
+#   1. Secret Detection     - custom Python engine (Block 1)
+#   2. Dependency Audit     - npm audit (frontend) + OWASP Dependency-Check (backend)
+#   3. SAST                 - Semgrep (multi-language static analysis)
+#   4. Container Scan       - Trivy image vulnerability scan
+#   5. IaC Scan             - Trivy config scan (Dockerfile / docker-compose)
+#   6. License Check        - license-checker (frontend)
 #
 # Quality Gate Logic:
-#   CRITICAL findings  → fail immediately, block merge
-#   HIGH findings      → fail the relevant job, block merge
-#   MEDIUM findings    → warn only, do not block
-#   LOW findings       → informational, never block
+#   CRITICAL findings  -> fail immediately, block merge
+#   HIGH findings      -> fail the relevant job, block merge
+#   MEDIUM findings    -> warn only, do not block
+#   LOW findings       -> informational, never block
 #
 # Scan reports are uploaded as artifacts for every run (pass or fail).
 # =============================================================================
@@ -41,10 +41,10 @@ jobs:
 
   # ===========================================================================
   # JOB 1: Secret Detection
-  # Runs first — fastest check. Fails immediately on any HIGH/CRITICAL secret.
+  # Runs first - fastest check. Fails immediately on any HIGH/CRITICAL secret.
   # ===========================================================================
   secret-detection:
-    name: "🔑 Secret Detection"
+    name: "Secret Detection"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -63,7 +63,7 @@ jobs:
       - name: Run Secret Detection Engine
         id: secret_scan
         run: |
-          # Exclude the scanner's own test fixtures — they contain intentional
+          # Exclude the scanner's own test fixtures - they contain intentional
           # "dirty" samples used to validate detection, not real secrets.
           python scripts/secret-detection/secret_detector.py \
             --path . \
@@ -82,16 +82,16 @@ jobs:
             TOTAL=$(python -c "import json,sys; d=json.load(open('${{ env.REPORTS_DIR }}/secret-scan.json')); print(d['summary']['total_findings'])")
             CRITICAL=$(python -c "import json,sys; d=json.load(open('${{ env.REPORTS_DIR }}/secret-scan.json')); print(d['summary']['by_severity']['CRITICAL'])")
             HIGH=$(python -c "import json,sys; d=json.load(open('${{ env.REPORTS_DIR }}/secret-scan.json')); print(d['summary']['by_severity']['HIGH'])")
-            echo "## 🔑 Secret Detection Results" >> $GITHUB_STEP_SUMMARY
+            echo "## Secret Detection Results" >> $GITHUB_STEP_SUMMARY
             echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
             echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
             echo "| Total findings | $TOTAL |" >> $GITHUB_STEP_SUMMARY
             echo "| CRITICAL | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
             echo "| HIGH | $HIGH |" >> $GITHUB_STEP_SUMMARY
             if [ "$TOTAL" -eq "0" ]; then
-              echo "✅ **No secrets detected**" >> $GITHUB_STEP_SUMMARY
+              echo "**No secrets detected**" >> $GITHUB_STEP_SUMMARY
             else
-              echo "❌ **Secrets detected — merge blocked**" >> $GITHUB_STEP_SUMMARY
+              echo "**Secrets detected - merge blocked**" >> $GITHUB_STEP_SUMMARY
             fi
           fi
 
@@ -103,10 +103,10 @@ jobs:
           path: ${{ env.REPORTS_DIR }}/secret-scan.json
           retention-days: 30
 
-      - name: Enforce quality gate — fail on secrets
+      - name: Enforce quality gate - fail on secrets
         if: steps.secret_scan.outcome == 'failure'
         run: |
-          echo "❌ QUALITY GATE FAILED: Secrets detected in source code."
+          echo "QUALITY GATE FAILED: Secrets detected in source code."
           echo "Review ${{ env.REPORTS_DIR }}/secret-scan.json for details."
           exit 1
 
@@ -115,7 +115,7 @@ jobs:
   # npm audit + Semgrep SAST + license check
   # ===========================================================================
   frontend-security:
-    name: "⚛️ Frontend Security Scan"
+    name: "Frontend Security Scan"
     runs-on: ubuntu-latest
     needs: secret-detection  # Only run if no secrets found
 
@@ -140,7 +140,7 @@ jobs:
           # (e.g. after intentionally removing the deprecated `codecov` dep),
           # fall back to `npm install` to reconcile the lock, then continue.
           npm ci --prefer-offline || {
-            echo "::warning::package-lock.json out of sync — reconciling with npm install"
+            echo "::warning::package-lock.json out of sync - reconciling with npm install"
             npm install --package-lock-only --no-audit
             npm ci --prefer-offline
           }
@@ -149,7 +149,7 @@ jobs:
         run: mkdir -p ../../${{ env.REPORTS_DIR }}
 
       # -------------------------------------------------------------------------
-      # Scanner 1: npm audit — RISK-BASED dependency vulnerability check
+      # Scanner 1: npm audit - RISK-BASED dependency vulnerability check
       #
       # Policy rationale (see docs/frontend-audit-triage.md):
       #   The app is built with Create React App (react-scripts). CRA pulls in a
@@ -158,14 +158,14 @@ jobs:
       #   bundle and (b) are unfixable without ejecting/breaking the build.
       #
       #   We therefore apply a risk-appropriate gate:
-      #     • BLOCKING  — production dependencies with CRITICAL vulns
+      #     • BLOCKING  - production dependencies with CRITICAL vulns
       #                   (these actually ship to end users)
-      #     • WARN-ONLY — dev/build-tooling advisories (reported, not blocking)
+      #     • WARN-ONLY - dev/build-tooling advisories (reported, not blocking)
       # -------------------------------------------------------------------------
-      - name: npm audit — production dependencies (blocking gate)
+      - name: npm audit - production dependencies (blocking gate)
         id: npm_audit_prod
         run: |
-          # Only production deps, only CRITICAL — the vulns that reach users
+          # Only production deps, only CRITICAL - the vulns that reach users
           npm audit --omit=dev --audit-level=critical --json \
             > ../../${{ env.REPORTS_DIR }}/npm-audit-prod.json || true
           PROD_CRITICAL=$(cat ../../${{ env.REPORTS_DIR }}/npm-audit-prod.json | python3 -c "
@@ -192,10 +192,10 @@ jobs:
           "
         continue-on-error: true
 
-      - name: npm audit — full tree (informational, non-blocking)
+      - name: npm audit - full tree (informational, non-blocking)
         id: npm_audit_full
         run: |
-          # Full dependency tree incl. dev/build tooling — reported for visibility
+          # Full dependency tree incl. dev/build tooling - reported for visibility
           npm audit --audit-level=high --json \
             > ../../${{ env.REPORTS_DIR }}/npm-audit.json || true
           FULL_HIGH_CRIT=$(cat ../../${{ env.REPORTS_DIR }}/npm-audit.json | python3 -c "
@@ -211,7 +211,7 @@ jobs:
         continue-on-error: true
 
       # -------------------------------------------------------------------------
-      # Scanner 2: Semgrep SAST — static analysis for security anti-patterns
+      # Scanner 2: Semgrep SAST - static analysis for security anti-patterns
       # Checks for: XSS, insecure eval, hardcoded secrets, prototype pollution
       # -------------------------------------------------------------------------
       - name: Semgrep SAST scan
@@ -278,7 +278,7 @@ jobs:
       - name: Write frontend security summary
         if: always()
         run: |
-          echo "## ⚛️ Frontend Security Results" >> $GITHUB_STEP_SUMMARY
+          echo "## Frontend Security Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Scanner | Scope | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-------|--------|" >> $GITHUB_STEP_SUMMARY
@@ -287,15 +287,15 @@ jobs:
           LIC_COUNT="${{ steps.license_check.outputs.license_violations }}"
           # Blocking gate: production CRITICAL only
           [ "${PROD_CRIT:-0}" -eq "0" ] \
-            && echo "| npm audit | Production deps (blocking) | ✅ Pass — 0 CRITICAL |" >> $GITHUB_STEP_SUMMARY \
-            || echo "| npm audit | Production deps (blocking) | ❌ $PROD_CRIT CRITICAL |" >> $GITHUB_STEP_SUMMARY
+            && echo "| npm audit | Production deps (blocking) | PASS - 0 CRITICAL |" >> $GITHUB_STEP_SUMMARY \
+            || echo "| npm audit | Production deps (blocking) | FAIL: $PROD_CRIT CRITICAL |" >> $GITHUB_STEP_SUMMARY
           # Informational: full tree incl. dev/build tooling
-          echo "| npm audit | Full tree incl. dev tooling (info) | ⚠️ ${FULL_HC:-0} HIGH/CRITICAL — see triage doc |" >> $GITHUB_STEP_SUMMARY
+          echo "| npm audit | Full tree incl. dev tooling (info) | WARN: ${FULL_HC:-0} HIGH/CRITICAL - see triage doc |" >> $GITHUB_STEP_SUMMARY
           [ "${LIC_COUNT:-0}" -eq "0" ] \
-            && echo "| License check | Production deps | ✅ Pass |" >> $GITHUB_STEP_SUMMARY \
-            || echo "| License check | Production deps | ⚠️ $LIC_COUNT violation(s) — non-blocking |" >> $GITHUB_STEP_SUMMARY
+            && echo "| License check | Production deps | PASS |" >> $GITHUB_STEP_SUMMARY \
+            || echo "| License check | Production deps | WARN: $LIC_COUNT violation(s) - non-blocking |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> Dev/build-tooling advisories from Create React App are accepted and tracked in \`docs/frontend-audit-triage.md\` (remediation: migrate CRA → Vite in Phase 2)." >> $GITHUB_STEP_SUMMARY
+          echo "> Dev/build-tooling advisories from Create React App are accepted and tracked in \`docs/frontend-audit-triage.md\` (remediation: migrate CRA -> Vite in Phase 2)." >> $GITHUB_STEP_SUMMARY
 
       - name: Upload frontend scan reports
         uses: actions/upload-artifact@v4
@@ -308,10 +308,10 @@ jobs:
             ${{ env.REPORTS_DIR }}/frontend-licenses.json
           retention-days: 30
 
-      - name: Enforce quality gate — production CRITICAL vulnerabilities
+      - name: Enforce quality gate - production CRITICAL vulnerabilities
         if: steps.npm_audit_prod.outputs.prod_critical_count != '0' && steps.npm_audit_prod.outputs.prod_critical_count != ''
         run: |
-          echo "❌ QUALITY GATE FAILED: ${{ steps.npm_audit_prod.outputs.prod_critical_count }} CRITICAL vulnerabilities in PRODUCTION dependencies."
+          echo "QUALITY GATE FAILED: ${{ steps.npm_audit_prod.outputs.prod_critical_count }} CRITICAL vulnerabilities in PRODUCTION dependencies."
           echo "These ship to end users and must be fixed before merge."
           echo "Review reports/npm-audit-prod.json for details."
           exit 1
@@ -321,7 +321,7 @@ jobs:
   # OWASP Dependency-Check + Semgrep Java SAST
   # ===========================================================================
   backend-security:
-    name: "☕ Backend Security Scan"
+    name: "Backend Security Scan"
     runs-on: ubuntu-latest
     needs: secret-detection
 
@@ -344,7 +344,7 @@ jobs:
         run: mkdir -p ../../${{ env.REPORTS_DIR }}
 
       # -------------------------------------------------------------------------
-      # Scanner 1: OWASP Dependency-Check — CVE scan for Java dependencies
+      # Scanner 1: OWASP Dependency-Check - CVE scan for Java dependencies
       # Quality gate: fail on CVSS >= 7 (HIGH/CRITICAL CVEs)
       # -------------------------------------------------------------------------
       - name: OWASP Dependency-Check
@@ -375,7 +375,7 @@ jobs:
             echo "OWASP report generated successfully."
           else
             echo "owasp_report=missing" >> $GITHUB_OUTPUT
-            echo "::warning::OWASP report not generated — likely an NVD database update failure (rate limiting). Add an NVD_API_KEY secret for reliable runs."
+            echo "::warning::OWASP report not generated - likely an NVD database update failure (rate limiting). Add an NVD_API_KEY secret for reliable runs."
           fi
         continue-on-error: true
         env:
@@ -448,20 +448,20 @@ jobs:
       - name: Write backend security summary
         if: always()
         run: |
-          echo "## ☕ Backend Security Results" >> $GITHUB_STEP_SUMMARY
+          echo "## Backend Security Results" >> $GITHUB_STEP_SUMMARY
           echo "| Scanner | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
           REPORT_PRESENT="${{ steps.owasp_eval.outputs.report_present }}"
           OWASP_HC="${{ steps.owasp_eval.outputs.high_critical }}"
           SG_COUNT="${{ steps.semgrep_java.outputs.semgrep_findings }}"
           if [ "$REPORT_PRESENT" != "true" ]; then
-            echo "| OWASP Dependency-Check | ⚠️ Skipped — NVD DB update unavailable (add NVD_API_KEY) |" >> $GITHUB_STEP_SUMMARY
+            echo "| OWASP Dependency-Check | SKIPPED - NVD DB update unavailable (add NVD_API_KEY) |" >> $GITHUB_STEP_SUMMARY
           elif [ "${OWASP_HC:-0}" -eq "0" ]; then
-            echo "| OWASP Dependency-Check | ✅ Pass — 0 HIGH/CRITICAL (post-suppression) |" >> $GITHUB_STEP_SUMMARY
+            echo "| OWASP Dependency-Check | PASS - 0 HIGH/CRITICAL (post-suppression) |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| OWASP Dependency-Check | ❌ $OWASP_HC HIGH/CRITICAL CVE(s) |" >> $GITHUB_STEP_SUMMARY
+            echo "| OWASP Dependency-Check | FAIL: $OWASP_HC HIGH/CRITICAL CVE(s) |" >> $GITHUB_STEP_SUMMARY
           fi
-          [ "${SG_COUNT:-0}" -eq "0" ] && echo "| Semgrep Java SAST | ✅ Pass |" >> $GITHUB_STEP_SUMMARY || echo "| Semgrep Java SAST | ⚠️ $SG_COUNT findings |" >> $GITHUB_STEP_SUMMARY
+          [ "${SG_COUNT:-0}" -eq "0" ] && echo "| Semgrep Java SAST | PASS |" >> $GITHUB_STEP_SUMMARY || echo "| Semgrep Java SAST | WARN: $SG_COUNT findings |" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload backend scan reports
         uses: actions/upload-artifact@v4
@@ -475,10 +475,10 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
-      - name: Enforce quality gate — OWASP
+      - name: Enforce quality gate - OWASP
         if: steps.owasp_eval.outputs.report_present == 'true' && steps.owasp_eval.outputs.high_critical != '0' && steps.owasp_eval.outputs.high_critical != ''
         run: |
-          echo "❌ QUALITY GATE FAILED: ${{ steps.owasp_eval.outputs.high_critical }} HIGH/CRITICAL CVE(s) in Java dependencies."
+          echo "QUALITY GATE FAILED: ${{ steps.owasp_eval.outputs.high_critical }} HIGH/CRITICAL CVE(s) in Java dependencies."
           echo "Review reports/dependency-check-report.json (or the HTML report) for details."
           exit 1
 
@@ -487,7 +487,7 @@ jobs:
   # Trivy scans the built Docker images for OS + library CVEs
   # ===========================================================================
   container-security:
-    name: "🐳 Container Security Scan"
+    name: "Container Security Scan"
     runs-on: ubuntu-latest
     needs: [ frontend-security, backend-security ]
 
@@ -499,7 +499,7 @@ jobs:
         run: mkdir -p ${{ env.REPORTS_DIR }}
 
       # -------------------------------------------------------------------------
-      # Scanner 1: Trivy — IaC / Dockerfile misconfiguration scan
+      # Scanner 1: Trivy - IaC / Dockerfile misconfiguration scan
       # Checks Dockerfiles and docker-compose for security issues before building
       # -------------------------------------------------------------------------
       - name: Trivy IaC / config scan
@@ -534,10 +534,10 @@ jobs:
           docker build -t country-service:scan \
             -f application/country-service/Dockerfile \
             application/country-service/ 2>/dev/null || \
-          echo "Dockerfile not found or build failed — skipping image scan"
+          echo "Dockerfile not found or build failed - skipping image scan"
         continue-on-error: true
 
-      - name: Trivy image scan — country-service
+      - name: Trivy image scan - country-service
         id: trivy_backend
         uses: aquasecurity/trivy-action@master
         with:
@@ -562,10 +562,10 @@ jobs:
           docker build -t country-flags-app:scan \
             -f application/country-flags-app/Dockerfile \
             application/country-flags-app/ 2>/dev/null || \
-          echo "Dockerfile not found or build failed — skipping image scan"
+          echo "Dockerfile not found or build failed - skipping image scan"
         continue-on-error: true
 
-      - name: Trivy image scan — country-flags-app
+      - name: Trivy image scan - country-flags-app
         id: trivy_frontend
         uses: aquasecurity/trivy-action@master
         with:
@@ -604,7 +604,7 @@ jobs:
             print(len(vulns))
           except: print(0)
           ")
-            echo "  $report → CRITICAL: $CRITICAL  HIGH: $HIGH"
+            echo "  $report -> CRITICAL: $CRITICAL  HIGH: $HIGH"
             TOTAL_CRITICAL=$((TOTAL_CRITICAL + CRITICAL))
             TOTAL_HIGH=$((TOTAL_HIGH + HIGH))
           done
@@ -612,14 +612,14 @@ jobs:
           echo "total_critical=$TOTAL_CRITICAL" >> $GITHUB_OUTPUT
           echo "total_high=$TOTAL_HIGH" >> $GITHUB_OUTPUT
 
-          echo "## 🐳 Container Security Results" >> $GITHUB_STEP_SUMMARY
+          echo "## Container Security Results" >> $GITHUB_STEP_SUMMARY
           echo "| Scanner | CRITICAL | HIGH |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|----------|------|" >> $GITHUB_STEP_SUMMARY
           echo "| Trivy (all) | $TOTAL_CRITICAL | $TOTAL_HIGH |" >> $GITHUB_STEP_SUMMARY
           if [ "$TOTAL_CRITICAL" -eq "0" ] && [ "$TOTAL_HIGH" -eq "0" ]; then
-            echo "✅ **Container scans passed**" >> $GITHUB_STEP_SUMMARY
+            echo "**Container scans passed**" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ **Container vulnerabilities found — review required**" >> $GITHUB_STEP_SUMMARY
+            echo "**Container vulnerabilities found - review required**" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Upload container scan reports
@@ -630,19 +630,19 @@ jobs:
           path: ${{ env.REPORTS_DIR }}/trivy-*.json
           retention-days: 30
 
-      - name: Enforce quality gate — CRITICAL container vulnerabilities
+      - name: Enforce quality gate - CRITICAL container vulnerabilities
         if: steps.trivy_gate.outputs.total_critical != '0' && steps.trivy_gate.outputs.total_critical != ''
         run: |
-          echo "❌ QUALITY GATE FAILED: ${{ steps.trivy_gate.outputs.total_critical }} CRITICAL container vulnerabilities found."
+          echo "QUALITY GATE FAILED: ${{ steps.trivy_gate.outputs.total_critical }} CRITICAL container vulnerabilities found."
           echo "Review trivy reports in ${{ env.REPORTS_DIR }}/ for details."
           exit 1
 
   # ===========================================================================
-  # JOB 5: Pipeline Summary — consolidate all results
+  # JOB 5: Pipeline Summary - consolidate all results
   # Runs last regardless of individual job outcomes
   # ===========================================================================
   pipeline-summary:
-    name: "📊 Pipeline Security Summary"
+    name: "Pipeline Security Summary"
     runs-on: ubuntu-latest
     needs: [ secret-detection, frontend-security, backend-security, container-security ]
     if: always()
@@ -656,24 +656,24 @@ jobs:
 
       - name: Generate consolidated summary
         run: |
-          echo "# 🛡️ DevSecOps Pipeline Security Summary" >> $GITHUB_STEP_SUMMARY
+          echo "# DevSecOps Pipeline Security Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔑 Secret Detection | ${{ needs.secret-detection.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ⚛️ Frontend Security | ${{ needs.frontend-security.result == 'success' && '✅ Pass' || needs.frontend-security.result == 'skipped' && '⏭️ Skipped' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ☕ Backend Security | ${{ needs.backend-security.result == 'success' && '✅ Pass' || needs.backend-security.result == 'skipped' && '⏭️ Skipped' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🐳 Container Security | ${{ needs.container-security.result == 'success' && '✅ Pass' || needs.container-security.result == 'skipped' && '⏭️ Skipped' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Detection | ${{ needs.secret-detection.result == 'success' && 'PASS' || 'FAIL' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Security | ${{ needs.frontend-security.result == 'success' && 'PASS' || needs.frontend-security.result == 'skipped' && 'SKIPPED' || 'FAIL' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Security | ${{ needs.backend-security.result == 'success' && 'PASS' || needs.backend-security.result == 'skipped' && 'SKIPPED' || 'FAIL' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Security | ${{ needs.container-security.result == 'success' && 'PASS' || needs.container-security.result == 'skipped' && 'SKIPPED' || 'FAIL' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "> All reports uploaded as workflow artifacts and retained for 30 days." >> $GITHUB_STEP_SUMMARY
 
-      - name: Final gate — fail pipeline if any security job failed
+      - name: Final gate - fail pipeline if any security job failed
         if: |
           needs.secret-detection.result == 'failure' ||
           needs.frontend-security.result == 'failure' ||
           needs.backend-security.result == 'failure' ||
           needs.container-security.result == 'failure'
         run: |
-          echo "❌ PIPELINE FAILED: One or more security gates did not pass."
+          echo "PIPELINE FAILED: One or more security gates did not pass."
           echo "Review the job summaries above and uploaded artifacts for details."
           exit 1

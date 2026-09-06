@@ -1,4 +1,4 @@
-# Secret Detection Engine
+﻿# Secret Detection Engine
 
 A Python-based secret scanner that detects hardcoded credentials, API keys, tokens, and
 passwords in source code and configuration files. Designed to integrate into CI/CD pipelines
@@ -6,20 +6,20 @@ as a quality gate.
 
 ## Features
 
-- **14 secret pattern categories** — AWS keys, GitHub tokens, Stripe keys, Google API keys,
+- **14 secret pattern categories** - AWS keys, GitHub tokens, Stripe keys, Google API keys,
   JWT tokens, private keys, DB connection strings, passwords, and more
-- **Smart false-positive filtering** — ignores `${ENV_VAR}` references, `process.env.*`,
+- **Smart false-positive filtering** - ignores `${ENV_VAR}` references, `process.env.*`,
   placeholder values (`changeme`, `xxxxx`, `<your-key>`), and commented-out lines
-- **Confidence scoring** — each finding includes a 0–100% confidence score
-- **Severity levels** — `CRITICAL / HIGH / MEDIUM / LOW` with an optional minimum filter
-- **Actionable remediation** — every finding includes a specific fix recommendation
-- **Dual output formats** — human-readable text and machine-parseable JSON
-- **CI quality gate** — exits with code `1` when CRITICAL or HIGH secrets are found
+- **Confidence scoring** - each finding includes a 0-100% confidence score
+- **Severity levels** - `CRITICAL / HIGH / MEDIUM / LOW` with an optional minimum filter
+- **Actionable remediation** - every finding includes a specific fix recommendation
+- **Dual output formats** - human-readable text and machine-parseable JSON
+- **CI quality gate** - exits with code `1` when CRITICAL or HIGH secrets are found
 
 ## Requirements
 
 - Python 3.8+
-- No external dependencies — uses only the standard library
+- No external dependencies - uses only the standard library
 
 ## Usage
 
@@ -62,7 +62,7 @@ python secret_detector.py --path ../../application/country-service/src/main/reso
       Fix       : Move to environment variable or secrets manager (e.g. AWS Secrets Manager, Vault).
 
 ======================================================================
-  RESULT: ❌  FAILED — secrets detected
+  RESULT: FAILED - secrets detected
 ======================================================================
 ```
 
@@ -70,8 +70,8 @@ python secret_detector.py --path ../../application/country-service/src/main/reso
 
 | Code | Meaning |
 |------|---------|
-| `0`  | No CRITICAL/HIGH secrets found — pipeline continues |
-| `1`  | CRITICAL or HIGH secrets detected — pipeline should fail |
+| `0`  | No CRITICAL/HIGH secrets found - pipeline continues |
+| `1`  | CRITICAL or HIGH secrets detected - pipeline should fail |
 | `2`  | Invalid arguments or path not found |
 
 ## Running Tests
@@ -88,9 +88,9 @@ python tests/test_secret_detector.py
 
 | # | Scenario | Expected |
 |---|----------|----------|
-| 1 | `clean_config.properties` — env-var references only | 0 findings, PASSED |
-| 2 | `dirty_config.properties` — hardcoded DB password + API key | ≥2 findings, FAILED |
-| 3 | `dirty_env.js` — AWS key, Stripe key, GitHub token, Google key | ≥4 findings, FAILED |
+| 1 | `clean_config.properties` - env-var references only | 0 findings, PASSED |
+| 2 | `dirty_config.properties` - hardcoded DB password + API key | >=2 findings, FAILED |
+| 3 | `dirty_env.js` - AWS key, Stripe key, GitHub token, Google key | >=4 findings, FAILED |
 | 4 | Severity filter `CRITICAL` on dirty file | Only CRITICAL findings returned |
 | 5 | Summary structure on directory scan | All summary keys present and consistent |
 
@@ -116,8 +116,8 @@ python tests/test_secret_detector.py
 
 The scanner actively suppresses common noise sources:
 
-- `${ENV_VAR}` and `$ENV_VAR` — environment variable references
-- `process.env.*` — Node.js env lookups
+- `${ENV_VAR}` and `$ENV_VAR` - environment variable references
+- `process.env.*` - Node.js env lookups
 - Values containing `changeme`, `placeholder`, `dummy`, `xxxxx`
 - Explicit `<your-api-key>` style placeholders
 - Values shorter than 8 characters

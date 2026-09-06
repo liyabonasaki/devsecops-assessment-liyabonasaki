@@ -1,5 +1,5 @@
-# =============================================================================
-# Secure Docker Compose — Country App Stack
+﻿# =============================================================================
+# Secure Docker Compose - Country App Stack
 # =============================================================================
 #
 # Security controls applied:
@@ -25,7 +25,7 @@
 services:
 
   # ---------------------------------------------------------------------------
-  # country-service — Spring Boot REST API
+  # country-service - Spring Boot REST API
   # ---------------------------------------------------------------------------
   country-service:
     build:
@@ -46,13 +46,13 @@ services:
     cap_drop:
       - ALL
 
-    # Read-only root filesystem — prevents writing malware/scripts to disk.
+    # Read-only root filesystem - prevents writing malware/scripts to disk.
     # Spring Boot needs /tmp for Tomcat temp files; mount as tmpfs.
     read_only: true
     tmpfs:
       - /tmp:mode=1777,size=128m
 
-    # Resource limits — prevent a compromised container exhausting host resources
+    # Resource limits - prevent a compromised container exhausting host resources
     deploy:
       resources:
         limits:
@@ -74,7 +74,7 @@ services:
       # JVM options (complement ENTRYPOINT flags in Dockerfile)
       JAVA_OPTS: "-Xms128m -Xmx384m"
 
-    # Only expose on internal network — not directly to host in production
+    # Only expose on internal network - not directly to host in production
     expose:
       - "8081"
 
@@ -90,7 +90,7 @@ services:
 
     restart: unless-stopped
 
-    # Log size limits — prevent log-based disk exhaustion
+    # Log size limits - prevent log-based disk exhaustion
     logging:
       driver: json-file
       options:
@@ -98,14 +98,14 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # country-flags-app — React SPA served by hardened Nginx
+  # country-flags-app - React SPA served by hardened Nginx
   # ---------------------------------------------------------------------------
   country-flags-app:
     build:
       context: ../application/country-flags-app
       dockerfile: Dockerfile
       args:
-        # Backend URL as seen from the browser — uses the host/proxy address
+        # Backend URL as seen from the browser - uses the host/proxy address
         REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8081}
     image: country-flags-app:latest
     container_name: country-flags-app
@@ -137,11 +137,11 @@ services:
 
     # Expose only on internal network; the host port mapping is for local dev
     ports:
-      - "127.0.0.1:3000:8080"  # Bind to loopback only — not 0.0.0.0
+      - "127.0.0.1:3000:8080"  # Bind to loopback only - not 0.0.0.0
 
     networks:
       - frontend-net
-      - backend-net   # Needs access to country-service for browser → API calls
+      - backend-net   # Needs access to country-service for browser -> API calls
 
     depends_on:
       country-service:
@@ -163,7 +163,7 @@ services:
         max-file: "3"
 
 # =============================================================================
-# Networks — segmentation between frontend and backend traffic
+# Networks - segmentation between frontend and backend traffic
 # =============================================================================
 networks:
   frontend-net:
@@ -175,10 +175,10 @@ networks:
 
   backend-net:
     driver: bridge
-    # Internal — not reachable from outside Docker unless explicitly mapped
+    # Internal - not reachable from outside Docker unless explicitly mapped
     internal: false
 
 # =============================================================================
-# Volumes — none required (H2 is in-memory; use a named volume for PostgreSQL
+# Volumes - none required (H2 is in-memory; use a named volume for PostgreSQL
 # when moving to a persistent database in production)
 # =============================================================================

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!--
   OWASP Dependency-Check Suppression File
   ========================================
@@ -18,7 +18,7 @@
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
     <!--
-      H2 database — the well-known H2 console CVEs (e.g. CVE-2021-42392,
+      H2 database - the well-known H2 console CVEs (e.g. CVE-2021-42392,
       CVE-2022-23221) require the H2 web console to be exposed and reachable.
       In this project H2 is an IN-MEMORY, runtime-scoped dev database and the
       console is disabled by default in the container deployment
@@ -28,7 +28,7 @@
     -->
     <suppress>
         <notes><![CDATA[
-            H2 console CVEs — console disabled in deployment; in-memory dev DB only.
+            H2 console CVEs - console disabled in deployment; in-memory dev DB only.
             Compensating control documented; Phase 2 migrates to PostgreSQL.
         ]]></notes>
         <packageUrl regex="true">^pkg:maven/com\.h2database/h2@.*$</packageUrl>
@@ -37,7 +37,7 @@
     </suppress>
 
     <!--
-      spring-boot-devtools — DEV-ONLY dependency (optional, runtime scope) that
+      spring-boot-devtools - DEV-ONLY dependency (optional, runtime scope) that
       is automatically excluded from the production fat JAR by Spring Boot. Any
       CVE here does not reach a built/deployed artifact. Accepted.
     -->
