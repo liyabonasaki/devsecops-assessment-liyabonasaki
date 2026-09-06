@@ -1,5 +1,5 @@
 # =============================================================================
-# Secure Docker Compose — Country App Stack
+# Secure Docker Compose - Country App Stack
 # =============================================================================
 #
 # Security controls applied:
@@ -25,12 +25,12 @@
 services:
 
   # ---------------------------------------------------------------------------
-  # country-service — Spring Boot REST API
+  # country-service - Spring Boot REST API
   # ---------------------------------------------------------------------------
   country-service:
     build:
-      context: ../assess/country-service-main
-      dockerfile: ../application/country-service/Dockerfile
+      context: ../application/country-service
+      dockerfile: Dockerfile
     image: country-service:latest
     container_name: country-service
 
@@ -46,13 +46,13 @@ services:
     cap_drop:
       - ALL
 
-    # Read-only root filesystem — prevents writing malware/scripts to disk.
+    # Read-only root filesystem - prevents writing malware/scripts to disk.
     # Spring Boot needs /tmp for Tomcat temp files; mount as tmpfs.
     read_only: true
     tmpfs:
       - /tmp:mode=1777,size=128m
 
-    # Resource limits — prevent a compromised container exhausting host resources
+    # Resource limits - prevent a compromised container exhausting host resources
     deploy:
       resources:
         limits:
@@ -74,15 +74,21 @@ services:
       # JVM options (complement ENTRYPOINT flags in Dockerfile)
       JAVA_OPTS: "-Xms128m -Xmx384m"
 
-    # Only expose on internal network — not directly to host in production
+    # Always available to other containers on the internal network.
     expose:
       - "8081"
+    # Published to the host on LOOPBACK ONLY (127.0.0.1), not 0.0.0.0, so the
+    # browser-based frontend can reach the API directly in this local setup.
+    # In production the backend would sit behind the reverse proxy / API gateway
+    # and this mapping would be removed (see docs/container-security.md).
+    ports:
+      - "127.0.0.1:8081:8081"
 
     networks:
       - backend-net
 
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/api/countries || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/api/countries || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -90,7 +96,7 @@ services:
 
     restart: unless-stopped
 
-    # Log size limits — prevent log-based disk exhaustion
+    # Log size limits - prevent log-based disk exhaustion
     logging:
       driver: json-file
       options:
@@ -98,14 +104,14 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # country-flags-app — React SPA served by hardened Nginx
+  # country-flags-app - React SPA served by hardened Nginx
   # ---------------------------------------------------------------------------
   country-flags-app:
     build:
-      context: ../assess/country-flags-app-main
-      dockerfile: ../application/country-flags-app/Dockerfile
+      context: ../application/country-flags-app
+      dockerfile: Dockerfile
       args:
-        # Backend URL as seen from the browser — uses the host/proxy address
+        # Backend URL as seen from the browser - uses the host/proxy address
         REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8081}
     image: country-flags-app:latest
     container_name: country-flags-app
@@ -137,18 +143,21 @@ services:
 
     # Expose only on internal network; the host port mapping is for local dev
     ports:
-      - "127.0.0.1:3000:8080"  # Bind to loopback only — not 0.0.0.0
+      - "127.0.0.1:3000:8080"  # Bind to loopback only - not 0.0.0.0
 
     networks:
       - frontend-net
-      - backend-net   # Needs access to country-service for browser → API calls
+      - backend-net   # Needs access to country-service for browser -> API calls
 
     depends_on:
       country-service:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      # Use 127.0.0.1 (not localhost): inside Alpine, localhost may resolve to
+      # IPv6 ::1 first, but nginx listens on IPv4 0.0.0.0:8080, causing the
+      # healthcheck to get "connection refused" even though the app is up.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -163,7 +172,7 @@ services:
         max-file: "3"
 
 # =============================================================================
-# Networks — segmentation between frontend and backend traffic
+# Networks - segmentation between frontend and backend traffic
 # =============================================================================
 networks:
   frontend-net:
@@ -175,10 +184,10 @@ networks:
 
   backend-net:
     driver: bridge
-    # Internal — not reachable from outside Docker unless explicitly mapped
+    # Internal - not reachable from outside Docker unless explicitly mapped
     internal: false
 
 # =============================================================================
-# Volumes — none required (H2 is in-memory; use a named volume for PostgreSQL
+# Volumes - none required (H2 is in-memory; use a named volume for PostgreSQL
 # when moving to a persistent database in production)
 # =============================================================================

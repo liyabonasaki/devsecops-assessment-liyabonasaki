@@ -1,0 +1,20 @@
+{
+    "transform": {
+        "^.+\\.jsx?$": "babel-jest"
+    },
+    "testEnvironment": "jsdom",
+    "collectCoverage": true,
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+        "src/**/*.{js,jsx,ts,tsx}",
+        "!src/index.js",
+        "!src/reportWebVitals.js",
+        "!src/**/*.test.{js,jsx,ts,tsx}"
+    ],
+    "coverageReporters": ["text", "lcov"],
+    "moduleFileExtensions": ["js", "jsx", "json"],
+    "moduleNameMapper": {
+        "^react-router-dom$": "<rootDir>/node_modules/react-router-dom/dist/index.js"
+    },
+    "setupFilesAfterEnv": ["<rootDir>/src/setupTests.js"]
+}

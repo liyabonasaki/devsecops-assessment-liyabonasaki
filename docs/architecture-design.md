@@ -13,33 +13,36 @@
 The provided application is a two-tier web stack:
 
 ```
-┌─────────────────────────┐        ┌──────────────────────────────┐
-│  country-flags-app       │        │  country-service              │
-│  React 18 SPA            │───────▶│  Spring Boot 3 / Java 11     │
-│  Port 3000               │  HTTP  │  Port 8081                   │
-│  npm / react-scripts     │        │  H2 in-memory DB             │
-└─────────────────────────┘        │  External: restcountries.com  │
-                                    └──────────────────────────────┘
+┌-------------------------┐        ┌------------------------------┐
+|  country-flags-app       |        |  country-service              |
+|  React 18 SPA            |-------▶|  Spring Boot 3 / Java 17     |
+|  Port 3000               |  HTTP  |  Port 8081                   |
+|  npm / react-scripts     |        |  H2 in-memory DB             |
+└-------------------------┘        |  External: restcountries.com  |
+                                    └------------------------------┘
 ```
 
 ### 1.2 Current Security Gaps
 
 A structured review of the provided source code reveals the following issues, ordered by risk:
 
-| # | Gap | Location | Risk |
-|---|-----|----------|------|
-| 1 | Hardcoded DB password (`password`) | `application.properties` | HIGH |
-| 2 | H2 console enabled in dev profile | `application.properties` | MEDIUM |
-| 3 | CORS allows all headers (`allowedHeaders("*")`) | `CorsConfig.java` | MEDIUM |
-| 4 | Spring Security version mismatch (2.7.0 pinned in Boot 3 project) | `pom.xml` | HIGH |
-| 5 | No HTTPS — all traffic in cleartext | Both apps | CRITICAL |
-| 6 | H2 in-memory DB — data lost on restart, no persistence | `application.properties` | MEDIUM |
-| 7 | No authentication on API endpoints | `CountryController.java` | MEDIUM |
-| 8 | External API call on startup, no timeout/retry config | `DataLoader.java` | LOW |
-| 9 | `axios@0.27.2` — outdated with known CVEs | `package.json` | HIGH |
-| 10 | No rate limiting or request size limits | Both apps | MEDIUM |
-| 11 | No structured logging or audit trail | Both apps | MEDIUM |
-| 12 | No container images — no hardening | Neither app | HIGH |
+| # | Gap | Location | Risk | Status |
+|---|-----|----------|------|--------|
+| 1 | Hardcoded DB password (`password`) | `application.properties` | HIGH | Fixed - now `${DB_PASSWORD}` env-var injection |
+| 2 | H2 console enabled by default | `application.properties` | MEDIUM | Fixed - now `${H2_CONSOLE_ENABLED:false}` |
+| 3 | CORS allows all headers (`allowedHeaders("*")`) | `CorsConfig.java` | MEDIUM | Planned - Phase 1 backlog |
+| 4 | Spring Security version mismatch (2.7.0 pinned in Boot 3 project) | `pom.xml` | HIGH | Fixed - removed pin; bumped Boot to 3.5.11 and pinned Spring Security 6.5.11 |
+| 5 | No HTTPS - all traffic in cleartext | Both apps | CRITICAL | Planned - Phase 2 (Nginx TLS) |
+| 6 | H2 in-memory DB - data lost on restart, no persistence | `application.properties` | MEDIUM | Planned - Phase 2 (PostgreSQL) |
+| 7 | No authentication on API endpoints | `CountryController.java` | MEDIUM | Planned - Phase 2 (JWT) |
+| 8 | External API call on startup, no timeout/retry config | `DataLoader.java` | LOW | Planned - Phase 3 |
+| 9 | `axios@0.27.2` - outdated with CRITICAL CVEs (SSRF, credential leak via follow-redirects) | `package.json` | HIGH | Fixed - upgraded to `axios@^1.7.9` (API-compatible, no code change) |
+| 10 | No rate limiting or request size limits | Both apps | MEDIUM | Planned - Phase 2 |
+| 11 | No structured logging or audit trail | Both apps | MEDIUM | Planned - Phase 2 |
+| 12 | No container images - no hardening | Neither app | HIGH | Fixed - hardened multi-stage Dockerfiles (Block 3) |
+| 13 | **Build defect**: source uses Java records but `pom.xml` targets Java 11 (records need 16+) | `pom.xml` + DTOs | HIGH | Fixed - bumped to Java 17 LTS |
+| 14 | **Test defect**: security starter causes `@WebMvcTest` controller tests to fail with 401 | `CountryControllerTest.java` | MEDIUM | Fixed - `@AutoConfigureMockMvc(addFilters=false)` |
+| 15 | **Container CVEs**: 8 CRITICAL in bundled Tomcat + Spring Security (via old Boot 3.4.3 BOM) | Spring Boot fat JAR | CRITICAL | Fixed - Boot 3.5.11, pinned Tomcat 10.1.59 + Spring Security 6.5.11 |
 
 ### 1.3 What's Already Good
 
@@ -59,80 +62,80 @@ A structured review of the provided source code reveals the following issues, or
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  DEVELOPER WORKSTATION                                                   ║
-║  ┌─────────┐  git push   ┌──────────────────────────────────────────┐   ║
-║  │  VS Code │────────────▶│  GitHub (Public Repo)                   │   ║
-║  │  + Kiro  │             │  branch: candidate-assessment           │   ║
-║  └─────────┘             └──────────────┬───────────────────────────┘   ║
+║  ┌---------┐  git push   ┌------------------------------------------┐   ║
+║  |  VS Code |------------▶|  GitHub (Public Repo)                   |   ║
+║  |  + Kiro  |             |  branch: candidate-assessment           |   ║
+║  └---------┘             └--------------┬---------------------------┘   ║
 ╚══════════════════════════════════════════╪═══════════════════════════════╝
-                                           │ webhook trigger
+                                           | webhook trigger
                          ╔═════════════════▼═══════════════════════════╗
-                         ║  GITHUB ACTIONS — SECURE PIPELINE           ║
+                         ║  GITHUB ACTIONS - SECURE PIPELINE           ║
                          ║                                              ║
-                         ║  ┌────────────┐  ┌──────────────────────┐  ║
-                         ║  │ Secret     │  │ (blocked if secrets  │  ║
-                         ║  │ Detection  │──▶  found)              │  ║
-                         ║  └─────┬──────┘  └──────────────────────┘  ║
-                         ║        │                                     ║
-                         ║  ┌─────▼──────┐  ┌─────────────────────┐   ║
-                         ║  │ Frontend   │  │ Backend Security     │   ║
-                         ║  │ Security   │  │ • OWASP Dep-Check    │   ║
-                         ║  │ • npm audit│  │ • Semgrep Java SAST  │   ║
-                         ║  │ • Semgrep  │  └─────────┬───────────┘   ║
-                         ║  │ • Licenses │            │               ║
-                         ║  └─────┬──────┘            │               ║
-                         ║        └──────────┬─────────┘               ║
-                         ║               ┌───▼────────────────────┐    ║
-                         ║               │ Container Security      │    ║
-                         ║               │ • Trivy IaC config scan │    ║
-                         ║               │ • Trivy image scan x2   │    ║
-                         ║               └───┬────────────────────┘    ║
-                         ║                   │ (on main branch only)   ║
-                         ║               ┌───▼────────────────────┐    ║
-                         ║               │ Build & Push to GHCR   │    ║
-                         ║               │ (signed + attested)     │    ║
-                         ║               └───┬────────────────────┘    ║
+                         ║  ┌------------┐  ┌----------------------┐  ║
+                         ║  | Secret     |  | (blocked if secrets  |  ║
+                         ║  | Detection  |--▶  found)              |  ║
+                         ║  └-----┬------┘  └----------------------┘  ║
+                         ║        |                                     ║
+                         ║  ┌-----▼------┐  ┌---------------------┐   ║
+                         ║  | Frontend   |  | Backend Security     |   ║
+                         ║  | Security   |  | • OWASP Dep-Check    |   ║
+                         ║  | • npm audit|  | • Semgrep Java SAST  |   ║
+                         ║  | • Semgrep  |  └---------┬-----------┘   ║
+                         ║  | • Licenses |            |               ║
+                         ║  └-----┬------┘            |               ║
+                         ║        └----------┬---------┘               ║
+                         ║               ┌---▼--------------------┐    ║
+                         ║               | Container Security      |    ║
+                         ║               | • Trivy IaC config scan |    ║
+                         ║               | • Trivy image scan x2   |    ║
+                         ║               └---┬--------------------┘    ║
+                         ║                   | (on main branch only)   ║
+                         ║               ┌---▼--------------------┐    ║
+                         ║               | Build & Push to GHCR   |    ║
+                         ║               | (signed + attested)     |    ║
+                         ║               └---┬--------------------┘    ║
                          ╚═══════════════════╪════════════════════════╝
-                                             │
+                                             |
                          ╔═══════════════════▼════════════════════════╗
                          ║  DEPLOYMENT ENVIRONMENT                    ║
                          ║                                            ║
-                         ║  ┌──────────────────────────────────────┐  ║
-                         ║  │  NGINX Reverse Proxy / Load Balancer │  ║
-                         ║  │  TLS termination (Let's Encrypt)     │  ║
-                         ║  │  WAF rules (rate limiting, headers)  │  ║
-                         ║  └──────────────┬───────────────────────┘  ║
-                         ║                 │                           ║
-                         ║    ┌────────────┴────────────┐             ║
+                         ║  ┌--------------------------------------┐  ║
+                         ║  |  NGINX Reverse Proxy / Load Balancer |  ║
+                         ║  |  TLS termination (Let's Encrypt)     |  ║
+                         ║  |  WAF rules (rate limiting, headers)  |  ║
+                         ║  └--------------┬-----------------------┘  ║
+                         ║                 |                           ║
+                         ║    ┌------------┴------------┐             ║
                          ║    ▼                         ▼             ║
-                         ║  ┌──────────────┐  ┌──────────────────┐   ║
-                         ║  │ country-     │  │ country-service   │   ║
-                         ║  │ flags-app    │  │ Spring Boot       │   ║
-                         ║  │ nginx:alpine │  │ JRE Alpine        │   ║
-                         ║  │ non-root     │  │ non-root UID 1001 │   ║
-                         ║  │ read-only FS │  │ read-only FS      │   ║
-                         ║  └──────────────┘  └────────┬─────────┘   ║
-                         ║                             │              ║
-                         ║                    ┌────────▼─────────┐   ║
-                         ║                    │  PostgreSQL       │   ║
-                         ║                    │  (replaces H2)   │   ║
-                         ║                    │  encrypted at    │   ║
-                         ║                    │  rest            │   ║
-                         ║                    └──────────────────┘   ║
+                         ║  ┌--------------┐  ┌------------------┐   ║
+                         ║  | country-     |  | country-service   |   ║
+                         ║  | flags-app    |  | Spring Boot       |   ║
+                         ║  | nginx:alpine |  | JRE Alpine        |   ║
+                         ║  | non-root     |  | non-root UID 1001 |   ║
+                         ║  | read-only FS |  | read-only FS      |   ║
+                         ║  └--------------┘  └--------┬---------┘   ║
+                         ║                             |              ║
+                         ║                    ┌--------▼---------┐   ║
+                         ║                    |  PostgreSQL       |   ║
+                         ║                    |  (replaces H2)   |   ║
+                         ║                    |  encrypted at    |   ║
+                         ║                    |  rest            |   ║
+                         ║                    └------------------┘   ║
                          ║                                            ║
-                         ║  ┌──────────────────────────────────────┐  ║
-                         ║  │  Secrets Manager (AWS SM / Vault)    │  ║
-                         ║  │  • DB credentials                    │  ║
-                         ║  │  • API keys                          │  ║
-                         ║  │  • TLS certificates                  │  ║
-                         ║  └──────────────────────────────────────┘  ║
+                         ║  ┌--------------------------------------┐  ║
+                         ║  |  Secrets Manager (AWS SM / Vault)    |  ║
+                         ║  |  • DB credentials                    |  ║
+                         ║  |  • API keys                          |  ║
+                         ║  |  • TLS certificates                  |  ║
+                         ║  └--------------------------------------┘  ║
                          ╚════════════════════════════════════════════╝
-                                             │
+                                             |
                          ╔═══════════════════▼════════════════════════╗
                          ║  OBSERVABILITY                             ║
-                         ║  • Structured logging → ELK / CloudWatch  ║
-                         ║  • Metrics → Prometheus + Grafana          ║
-                         ║  • Alerts → PagerDuty / Slack              ║
-                         ║  • Security events → SIEM                  ║
+                         ║  • Structured logging -> ELK / CloudWatch  ║
+                         ║  • Metrics -> Prometheus + Grafana          ║
+                         ║  • Alerts -> PagerDuty / Slack              ║
+                         ║  • Security events -> SIEM                  ║
                          ╚════════════════════════════════════════════╝
 ```
 
@@ -141,8 +144,8 @@ A structured review of the provided source code reveals the following issues, or
 Security is embedded at every stage rather than applied as a final gate:
 
 ```
-Code          →  Commit        →  Build         →  Deploy       →  Runtime
-─────────────────────────────────────────────────────────────────────────────
+Code          ->  Commit        ->  Build         ->  Deploy       ->  Runtime
+-----------------------------------------------------------------------------
 IDE linting      Pre-commit       Secret scan      Image sign      WAF
 Type safety      hooks            Dep audit        SBOM gen        Rate limiting
 SAST plugin      Secret scan      SAST (Semgrep)   Env secrets     Anomaly alerts
@@ -161,7 +164,7 @@ SAST plugin      Secret scan      SAST (Semgrep)   Env secrets     Anomaly alert
 |----------|------------|------------------------|-----------------|
 | Secret Detection | Custom Python engine | truffleHog, detect-secrets | Full control over patterns, false-positive tuning, no external dependency in pipeline |
 | SAST | Semgrep | SonarQube, CodeQL | Free OSS rulesets for Java+JS+React, fast, GitHub-native SARIF integration |
-| Dependency Scan (Java) | OWASP Dependency-Check | Snyk, Grype | Free, NVD-backed, Maven plugin — no third-party API key required |
+| Dependency Scan (Java) | OWASP Dependency-Check | Snyk, Grype | Free, NVD-backed, Maven plugin - no third-party API key required |
 | Dependency Scan (JS) | npm audit | Snyk, Yarn audit | Built-in to npm, no setup needed, reliable for Node.js CVEs |
 | Container Scan | Trivy | Snyk, Grype, Clair | Single tool covers IaC + image + SBOM; fast; GitHub Action available |
 | IaC Scan | Trivy config | Checkov, tfsec | Already using Trivy; avoids adding another tool |
@@ -195,26 +198,26 @@ Security controls are layered so that the failure of any single control does not
 lead to a breach:
 
 ```
-Layer 1 — Developer (IDE)
-  └── ESLint security rules, type checking, SAST plugin feedback
+Layer 1 - Developer (IDE)
+  └-- ESLint security rules, type checking, SAST plugin feedback
 
-Layer 2 — Source Control (GitHub)
-  └── Branch protection, required PR reviews, signed commits
+Layer 2 - Source Control (GitHub)
+  └-- Branch protection, required PR reviews, signed commits
 
-Layer 3 — CI Pipeline (GitHub Actions)
-  └── Secret scan → Dep audit → SAST → Container scan → Quality gate
+Layer 3 - CI Pipeline (GitHub Actions)
+  └-- Secret scan -> Dep audit -> SAST -> Container scan -> Quality gate
 
-Layer 4 — Container (Docker)
-  └── Non-root, read-only FS, cap_drop ALL, no-new-privileges
+Layer 4 - Container (Docker)
+  └-- Non-root, read-only FS, cap_drop ALL, no-new-privileges
 
-Layer 5 — Network (Nginx + Compose)
-  └── TLS, security headers, CSP, rate limiting, network segmentation
+Layer 5 - Network (Nginx + Compose)
+  └-- TLS, security headers, CSP, rate limiting, network segmentation
 
-Layer 6 — Runtime (Application)
-  └── Spring Security, input validation, structured error responses
+Layer 6 - Runtime (Application)
+  └-- Spring Security, input validation, structured error responses
 
-Layer 7 — Observability
-  └── Structured logs, anomaly detection, SIEM, alerting
+Layer 7 - Observability
+  └-- Structured logs, anomaly detection, SIEM, alerting
 ```
 
 An attacker would need to defeat all 7 layers to achieve a meaningful breach.
@@ -227,18 +230,18 @@ Target state (production):
 
 ```
 Application startup
-      │
+      |
       ▼
 AWS ECS Task / K8s Pod
-      │
-      ├── IAM Role (no long-lived credentials)
-      │
+      |
+      ├-- IAM Role (no long-lived credentials)
+      |
       ▼
 AWS Secrets Manager
-      │
-      ├── DB_PASSWORD      → injected as env var
-      ├── API_KEY          → injected as env var
-      └── TLS_CERT         → mounted as volume
+      |
+      ├-- DB_PASSWORD      -> injected as env var
+      ├-- API_KEY          -> injected as env var
+      └-- TLS_CERT         -> mounted as volume
 ```
 
 No secrets exist in:
@@ -251,40 +254,40 @@ No secrets exist in:
 
 ```
 Internet
-    │
-    ▼  HTTPS only (HTTP → 301 redirect)
-┌───────────────────────────────┐
-│  WAF / Load Balancer          │  Rate limiting: 100 req/s per IP
-│  (AWS ALB + WAF or CloudFront)│  Geo-blocking (optional)
-└───────────────┬───────────────┘
-                │  Internal network only
-    ┌───────────┴─────────────┐
-    │  DMZ subnet              │
-    │  Nginx reverse proxy     │  TLS termination, security headers
-    └───────────┬─────────────┘
-                │  Private subnet — no direct internet access
-    ┌───────────┴─────────────────────────┐
-    │                                      │
+    |
+    ▼  HTTPS only (HTTP -> 301 redirect)
+┌-------------------------------┐
+|  WAF / Load Balancer          |  Rate limiting: 100 req/s per IP
+|  (AWS ALB + WAF or CloudFront)|  Geo-blocking (optional)
+└---------------┬---------------┘
+                |  Internal network only
+    ┌-----------┴-------------┐
+    |  DMZ subnet              |
+    |  Nginx reverse proxy     |  TLS termination, security headers
+    └-----------┬-------------┘
+                |  Private subnet - no direct internet access
+    ┌-----------┴-------------------------┐
+    |                                      |
     ▼                                      ▼
 country-flags-app                  country-service
 (frontend-net)                     (backend-net)
-    │                                      │
-    └──────────────────────────────────────┘
-                    │
+    |                                      |
+    └--------------------------------------┘
+                    |
                     ▼  Encrypted connection (TLS)
              PostgreSQL
-             (data subnet — most restricted)
+             (data subnet - most restricted)
 ```
 
 ### 4.4 API Security Controls
 
 The current API has no authentication. Target state adds:
 
-1. **JWT Bearer tokens** — stateless auth, short-lived (15 min access, 7 day refresh)
-2. **Rate limiting** — per-IP and per-user via Spring's `HandlerInterceptor` or API gateway
-3. **Input validation** — `@Valid` + Bean Validation on all request parameters
-4. **CORS restriction** — replace `allowedHeaders("*")` with explicit header whitelist
-5. **Audit logging** — log all API calls with user identity, IP, timestamp, response code
+1. **JWT Bearer tokens** - stateless auth, short-lived (15 min access, 7 day refresh)
+2. **Rate limiting** - per-IP and per-user via Spring's `HandlerInterceptor` or API gateway
+3. **Input validation** - `@Valid` + Bean Validation on all request parameters
+4. **CORS restriction** - replace `allowedHeaders("*")` with explicit header whitelist
+5. **Audit logging** - log all API calls with user identity, IP, timestamp, response code
 
 ---
 
@@ -292,23 +295,23 @@ The current API has no authentication. Target state adds:
 
 Prioritised into three phases based on risk reduction value and implementation effort:
 
-### Phase 1 — Immediate (Week 1–2) · Fix Current Vulnerabilities
+### Phase 1 - Immediate (Week 1-2) · Fix Current Vulnerabilities
 
 **Goal**: Eliminate all HIGH/CRITICAL findings identified in Section 1.2
 
 | Priority | Action | Effort | Risk Reduced |
 |----------|--------|--------|-------------|
-| 🔴 P1 | Remove hardcoded `password` from `application.properties` | 1h | HIGH |
-| 🔴 P1 | Fix Spring Security version mismatch in `pom.xml` | 1h | HIGH |
-| 🔴 P1 | Upgrade `axios` from 0.27.2 to 1.x (CVE fixes) | 2h | HIGH |
-| 🟠 P2 | Restrict CORS `allowedHeaders` to explicit list | 1h | MEDIUM |
-| 🟠 P2 | Disable H2 console in all non-dev profiles | 30m | MEDIUM |
-| 🟠 P2 | Add `.env` to `.gitignore` (done in this assessment) | 5m | HIGH |
-| 🟡 P3 | Configure `application.properties` to read credentials from env vars | 1h | HIGH |
+| P1 | Remove hardcoded `password` from `application.properties` | 1h | HIGH |
+| P1 | Fix Spring Security version mismatch in `pom.xml` | 1h | HIGH |
+| P1 | Upgrade `axios` from 0.27.2 to 1.x (CVE fixes) | 2h | HIGH |
+| P2 | Restrict CORS `allowedHeaders` to explicit list | 1h | MEDIUM |
+| P2 | Disable H2 console in all non-dev profiles | 30m | MEDIUM |
+| P2 | Add `.env` to `.gitignore` (done in this assessment) | 5m | HIGH |
+| P3 | Configure `application.properties` to read credentials from env vars | 1h | HIGH |
 
 **Deliverable**: All security scanners pass with zero HIGH/CRITICAL findings.
 
-### Phase 2 — Short Term (Month 1–2) · Harden the Platform
+### Phase 2 - Short Term (Month 1-2) · Harden the Platform
 
 **Goal**: Establish repeatable, automated security practices
 
@@ -326,13 +329,13 @@ Prioritised into three phases based on risk reduction value and implementation e
 **Deliverable**: Fully containerised, authenticated, HTTPS-only application with
 automated CI security gates.
 
-### Phase 3 — Medium Term (Month 3–6) · Scale and Mature
+### Phase 3 - Medium Term (Month 3-6) · Scale and Mature
 
 **Goal**: Enterprise-grade security posture
 
 | Action | Effort | Outcome |
 |--------|--------|---------|
-| Migrate to AWS ECS or Kubernetes | 1–2 weeks | Auto-scaling, self-healing |
+| Migrate to AWS ECS or Kubernetes | 1-2 weeks | Auto-scaling, self-healing |
 | Integrate AWS Secrets Manager / HashiCorp Vault | 3 days | Centralised secret rotation |
 | Add DAST scanning (OWASP ZAP) to pipeline | 2 days | Runtime vulnerability detection |
 | Implement Software Bill of Materials (SBOM) generation | 1 day | Supply chain transparency |
@@ -352,11 +355,11 @@ automated CI security gates.
 
 ```
 Traditional (Shift-Right):
-Dev writes code → QA tests → Security reviews → (hopefully) fix → Deploy
-Problem: Security is a bottleneck at the end; fixing late is 10–100x more expensive
+Dev writes code -> QA tests -> Security reviews -> (hopefully) fix -> Deploy
+Problem: Security is a bottleneck at the end; fixing late is 10-100x more expensive
 
 Shift-Left (this architecture):
-Security tools in IDE → Pre-commit hooks → PR gate → Automated pipeline
+Security tools in IDE -> Pre-commit hooks -> PR gate -> Automated pipeline
 Problem solved: Developers get security feedback in seconds, not weeks
 ```
 
@@ -366,28 +369,28 @@ Key principle: **security controls should not slow developers down**.
 
 - Pre-commit hooks run in <5 seconds (secret scan only, not full OWASP DC)
 - Pipeline parallelises frontend and backend scans to minimise wall-clock time
-- MEDIUM findings are warnings, not blockers — developers can keep moving
-- Scan reports are attached to every PR — no context switching to find results
-- Semgrep provides inline code annotations in GitHub — fix at the exact line
+- MEDIUM findings are warnings, not blockers - developers can keep moving
+- Scan reports are attached to every PR - no context switching to find results
+- Semgrep provides inline code annotations in GitHub - fix at the exact line
 
 ### 6.3 Pull Request Workflow
 
 ```
 Developer creates PR
-        │
+        |
         ▼
 GitHub Actions pipeline triggers
-        │
-        ├── Secret scan (fastest — ~30s)
-        │
-        ├── npm audit + Semgrep (parallel, ~3 min)
-        │
-        ├── OWASP Dependency-Check + Semgrep Java (parallel, ~5 min)
-        │
-        └── Trivy container scans (~2 min)
-                │
-                ├── All pass → PR marked green → reviewer can merge
-                └── Any fail → PR blocked → developer notified with report link
+        |
+        ├-- Secret scan (fastest - ~30s)
+        |
+        ├-- npm audit + Semgrep (parallel, ~3 min)
+        |
+        ├-- OWASP Dependency-Check + Semgrep Java (parallel, ~5 min)
+        |
+        └-- Trivy container scans (~2 min)
+                |
+                ├-- All pass -> PR marked green -> reviewer can merge
+                └-- Any fail -> PR blocked -> developer notified with report link
 ```
 
 ---
@@ -396,12 +399,12 @@ GitHub Actions pipeline triggers
 
 | Approach | Cost | Complexity | Security Value | Recommendation |
 |----------|------|------------|----------------|----------------|
-| Current (no security tooling) | $0 | Low | ❌ Very Low | Replace immediately |
-| This assessment (OSS only) | $0 | Medium | ✅ High | **Implement now** |
-| Add Snyk Pro | ~$98/dev/month | Medium | ✅ Very High | Consider at 5+ devs |
-| Full SonarQube server | ~$150/month (cloud) | High | ✅ Very High | Consider at 10+ devs |
-| AWS Security Hub + GuardDuty | ~$50–200/month | Medium | ✅ Very High | Implement at AWS deployment |
-| HashiCorp Vault (self-hosted) | Infra cost only | High | ✅ Critical | Use AWS SM as simpler alternative |
+| Current (no security tooling) | $0 | Low | No Very Low | Replace immediately |
+| This assessment (OSS only) | $0 | Medium | Done High | **Implement now** |
+| Add Snyk Pro | ~$98/dev/month | Medium | Done Very High | Consider at 5+ devs |
+| Full SonarQube server | ~$150/month (cloud) | High | Done Very High | Consider at 10+ devs |
+| AWS Security Hub + GuardDuty | ~$50-200/month | Medium | Done Very High | Implement at AWS deployment |
+| HashiCorp Vault (self-hosted) | Infra cost only | High | Done Critical | Use AWS SM as simpler alternative |
 
 **Key takeaway**: This assessment demonstrates that a high-quality DevSecOps posture
 is achievable at **zero incremental cost** using OSS tools. The foundation is correct;
@@ -416,7 +419,7 @@ The architecture maps naturally to common compliance frameworks:
 | Control | Framework | Implementation |
 |---------|-----------|---------------|
 | Access control | SOC2 CC6, ISO27001 A.9 | JWT auth, RBAC, non-root containers |
-| Secrets management | SOC2 CC6.7, PCI DSS 3.4 | `.env` → Secrets Manager migration |
+| Secrets management | SOC2 CC6.7, PCI DSS 3.4 | `.env` -> Secrets Manager migration |
 | Vulnerability management | SOC2 CC7.1, NIST CSF ID.RA | OWASP DC, Trivy, npm audit in pipeline |
 | Change management | SOC2 CC8.1 | PR reviews, branch protection, CI gates |
 | Audit logging | SOC2 CC7.2, ISO27001 A.12.4 | Structured logging, SIEM integration |
@@ -432,8 +435,8 @@ stage of the software delivery lifecycle without adding significant overhead:
 
 1. **Developers** get immediate feedback through IDE plugins and pre-commit hooks
 2. **Every PR** is automatically scanned by 5 security tools before any reviewer looks at it
-3. **Container images** are hardened by default — non-root, minimal, read-only
-4. **Secrets never touch source code** — enforced by tooling, not just policy
+3. **Container images** are hardened by default - non-root, minimal, read-only
+4. **Secrets never touch source code** - enforced by tooling, not just policy
 5. **The platform scales** from the current Docker Compose deployment to Kubernetes
    without changing the security model
 

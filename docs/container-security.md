@@ -9,15 +9,15 @@ Both images follow multi-stage build patterns and apply defence-in-depth at ever
 
 ```
 application/
-├── country-service/
-│   └── Dockerfile          ← Spring Boot (Java 11) — 2-stage build
-└── country-flags-app/
-    ├── Dockerfile           ← React 18 + Nginx — 2-stage build
-    └── nginx.conf           ← Hardened Nginx configuration
+├-- country-service/
+|   └-- Dockerfile          <- Spring Boot (Java 17) - 2-stage build
+└-- country-flags-app/
+    ├-- Dockerfile           <- React 18 + Nginx - 2-stage build
+    └-- nginx.conf           <- Hardened Nginx configuration
 
 infrastructure/
-├── docker-compose.yml       ← Secure orchestration
-└── .env.example             ← Credentials template (never commit .env)
+├-- docker-compose.yml       <- Secure orchestration
+└-- .env.example             <- Credentials template (never commit .env)
 ```
 
 ## Security Controls Applied
@@ -26,13 +26,13 @@ infrastructure/
 
 | Stage | Image | Purpose | Ships to production? |
 |-------|-------|---------|---------------------|
-| builder (backend) | `eclipse-temurin:11-jdk-alpine` | Compile JAR | ❌ No |
-| runtime (backend) | `eclipse-temurin:11-jre-alpine` | Run JAR | ✅ Yes |
-| builder (frontend) | `node:18-alpine` | `npm build` | ❌ No |
-| runtime (frontend) | `nginx:1.27-alpine` | Serve static files | ✅ Yes |
+| builder (backend) | `eclipse-temurin:17-jdk-alpine` | Compile JAR | No |
+| runtime (backend) | `eclipse-temurin:17-jre-alpine` | Run JAR | Yes |
+| builder (frontend) | `node:18-alpine` | `npm build` | No |
+| runtime (frontend) | `nginx:1.30-alpine` | Serve static files | Yes |
 
 **Why it matters**: The build stage contains Maven, npm, all `node_modules`, the JDK,
-and build caches — all potential attack surface. None of it reaches the final image.
+and build caches - all potential attack surface. None of it reaches the final image.
 
 ### 2. Non-Root Users
 
@@ -45,7 +45,7 @@ Both containers run as unprivileged users:
 
 Running as root is explicitly blocked in docker-compose with `user: "1001:1001"`.
 If a vulnerability allows code execution inside the container, the attacker gets a
-shell with no write access and no sudo — severely limiting lateral movement.
+shell with no write access and no sudo - severely limiting lateral movement.
 
 ### 3. Read-Only Root Filesystem
 
@@ -70,7 +70,7 @@ cap_drop:
 ```
 
 This removes all Linux capabilities (e.g. `NET_ADMIN`, `SYS_PTRACE`, `CHOWN`).
-Neither Spring Boot nor Nginx requires any special capabilities to operate — they
+Neither Spring Boot nor Nginx requires any special capabilities to operate - they
 run fine with zero capabilities.
 
 ### 5. No Privilege Escalation
@@ -96,18 +96,27 @@ Prevents a compromised container from exhausting host resources (DoS via CPU/mem
 
 ```
 Internet
-    │
-    └── host port 127.0.0.1:3000  ← loopback only, not 0.0.0.0
-            │
+    |
+    +-- host port 127.0.0.1:3000  <- frontend, loopback only, not 0.0.0.0
+    |
+    +-- host port 127.0.0.1:8081  <- backend, loopback only (local dev/testing)
+            |
     country-flags-app  (frontend-net + backend-net)
-            │
-    country-service    (backend-net only)
+            |
+    country-service    (backend-net)
 ```
 
-- `country-service` is never directly exposed to the host
-- `frontend-net` has ICC (inter-container communication) disabled — containers
-  on this network cannot talk to each other laterally
-- The backend port (8081) is `expose`-only, not `ports` — invisible to the host
+- Both services are published to the host on **loopback only** (`127.0.0.1`),
+  never on `0.0.0.0`, so they are reachable from this machine but not from the
+  wider network.
+- `frontend-net` has ICC (inter-container communication) disabled - containers
+  on this network cannot talk to each other laterally.
+- **Local vs production**: the backend's `127.0.0.1:8081` host mapping exists so the
+  browser-based frontend can call the API directly in this simplified local setup
+  (there is no reverse proxy routing `/api` to the backend). In a production
+  deployment the backend would sit behind the reverse proxy / API gateway and this
+  host mapping would be removed, leaving `country-service` reachable only over the
+  internal `backend-net`.
 
 ### 8. Secrets Management
 
@@ -142,21 +151,21 @@ The custom `nginx.conf` adds the following headers on every response:
 
 Every service has a `HEALTHCHECK` instruction in its Dockerfile and a matching
 `healthcheck` in docker-compose. The frontend `depends_on` the backend with
-`condition: service_healthy` — the stack only starts when the API is ready.
+`condition: service_healthy` - the stack only starts when the API is ready.
 
 ## Running the Stack
 
 ```bash
 # 1. Copy and configure credentials
 cp infrastructure/.env.example infrastructure/.env
-# Edit infrastructure/.env — set DB_PASSWORD
+# Edit infrastructure/.env - set DB_PASSWORD
 
 # 2. Build and start
 docker compose -f infrastructure/docker-compose.yml --env-file infrastructure/.env up --build
 
 # 3. Access
 #    Frontend: http://localhost:3000
-#    API:      http://localhost:8081/api/countries  (internal only)
+#    API:      http://localhost:8081/api/countries  (loopback-only host mapping)
 
 # 4. Stop
 docker compose -f infrastructure/docker-compose.yml down
@@ -167,21 +176,53 @@ docker compose -f infrastructure/docker-compose.yml down
 The pipeline (Block 2) automatically scans both images with **Trivy**:
 
 ```bash
-# Manual scan — run before pushing
+# Manual scan - run before pushing
 trivy image country-service:latest --severity CRITICAL,HIGH
 trivy image country-flags-app:latest --severity CRITICAL,HIGH
 
-# IaC/config scan — check Dockerfiles and compose for misconfigurations
+# IaC/config scan - check Dockerfiles and compose for misconfigurations
 trivy config . --severity CRITICAL,HIGH
 ```
+
+## Vulnerability Remediation & Residual Findings
+
+The container gate **blocks on CRITICAL** (HIGH is reported as a warning). Trivy runs
+with `ignore-unfixed: true`, so only vulnerabilities with an available fix are counted.
+
+### CRITICALs - all remediated
+
+The initial scan flagged 8 CRITICALs, all in the backend image's bundled Java
+dependencies (the frontend image and the Dockerfile config scan were clean):
+
+| Component | CVE class | Fix |
+|-----------|-----------|-----|
+| Embedded Tomcat (`tomcat-coyote`) | Auth bypass, security-constraint bypass | Pinned `tomcat.version=10.1.59` |
+| Spring Security | Authorization bypass; unwritten HTTP headers (affected <= 6.5.8) | Pinned `spring-security.version=6.5.11` |
+
+Both were driven by the old Spring Boot 3.4.3 BOM; the project now uses Boot 3.5.11
+with the two version overrides above. Result: **0 CRITICAL**.
+
+### Residual HIGHs - non-blocking, documented
+
+The remaining HIGH findings do not block the gate and fall into two groups:
+
+| Group | Example | Why not blocking here |
+|-------|---------|----------------------|
+| Alpine base-image OS packages | `openssl`/`libssl3` QUIC DoS (CVE-2026-14456) | Ship in `eclipse-temurin:17-jre-alpine`. The app does not run an OpenSSL QUIC server, so the DoS vector is not reachable. Cleared automatically when the base image publishes a patched Alpine build; rebuild picks it up. |
+| Transitive Java libs | `jackson-core` async-parser edge case | Managed by the Boot BOM; will clear on the next Boot patch. Not reachable via the app's simple REST endpoints. |
+
+These are tracked rather than force-fixed because (a) they are HIGH not CRITICAL,
+(b) `ignore-unfixed` already filters out anything with no upstream fix, and (c)
+base-image OS CVEs are remediated by rebuilding once the upstream Alpine package
+updates - not by application changes.
 
 ## Base Image Selection Rationale
 
 | Image | Why chosen |
 |-------|-----------|
-| `eclipse-temurin:11-jdk-alpine` | Adoptium LTS, smaller than Debian-based, actively patched |
-| `eclipse-temurin:11-jre-alpine` | JRE only — removes compiler, jshell, javac from final image |
+| `eclipse-temurin:17-jdk-alpine` | Adoptium LTS (Java 17), smaller than Debian-based, actively patched |
+| `eclipse-temurin:17-jre-alpine` | JRE only - removes compiler, jshell, javac from final image |
 | `node:18-alpine` | LTS Node, Alpine reduces CVE surface vs Debian node |
-| `nginx:1.27-alpine` | Current stable, Alpine base, minimal footprint (~40 MB) |
+| `nginx:1.30-alpine` | Current stable (stable-alpine, Alpine 3.24), patched OpenSSL, minimal footprint |
 
 All base images use pinned minor versions (not `latest`) to ensure reproducible builds.

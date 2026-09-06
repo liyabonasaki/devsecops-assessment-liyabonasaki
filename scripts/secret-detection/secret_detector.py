@@ -18,7 +18,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass, asdict, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -135,7 +135,7 @@ SECRET_PATTERNS = [
 ]
 
 # ---------------------------------------------------------------------------
-# False positive filter patterns — reduce noise for well-known placeholders
+# False positive filter patterns - reduce noise for well-known placeholders
 # ---------------------------------------------------------------------------
 FALSE_POSITIVE_PATTERNS = [
     r"(?i)\$\{[^}]+\}",            # ${ENV_VAR} style substitution
@@ -167,6 +167,7 @@ SCANNABLE_EXTENSIONS = {
 SKIP_DIRS = {
     ".git", "node_modules", "__pycache__", ".tox", "venv", ".venv",
     "dist", "build", "target", ".idea", ".vscode", "coverage",
+    "reports",  # scanner's own output dir - avoid self-scanning reports
 }
 
 
@@ -200,15 +201,25 @@ class ScanResult:
 # Core scanner
 # ---------------------------------------------------------------------------
 class SecretDetector:
-    def __init__(self, path: str, severity_filter: Optional[str] = None):
+    def __init__(self, path: str, severity_filter: Optional[str] = None,
+                 exclude: Optional[List[str]] = None):
         self.root = Path(path).resolve()
         self.severity_filter = severity_filter
+        # Path substrings to exclude from scanning (e.g. the scanner's own
+        # test fixtures which contain intentional "dirty" samples).
+        self.exclude = exclude or []
         self.severity_order = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
         self._compiled_patterns = [
             (name, re.compile(pattern), confidence, severity, desc)
             for name, pattern, confidence, severity, desc in SECRET_PATTERNS
         ]
         self._fp_compiled = [re.compile(p) for p in FALSE_POSITIVE_PATTERNS]
+
+    def _is_excluded(self, file_path: Path) -> bool:
+        """True if the file path matches any user-supplied exclude substring."""
+        # Normalise to forward slashes so patterns work cross-platform
+        normalised = str(file_path).replace("\\", "/")
+        return any(pattern.replace("\\", "/") in normalised for pattern in self.exclude)
 
     def _should_skip_dir(self, dir_name: str) -> bool:
         return dir_name in SKIP_DIRS
@@ -303,7 +314,7 @@ class SecretDetector:
     def scan(self) -> ScanResult:
         result = ScanResult(
             scan_path=str(self.root),
-            scan_timestamp=datetime.utcnow().isoformat() + "Z",
+            scan_timestamp=datetime.now(timezone.utc).isoformat(),
             files_scanned=0,
         )
 
@@ -316,6 +327,8 @@ class SecretDetector:
                 dirnames[:] = [d for d in dirnames if not self._should_skip_dir(d)]
                 for fname in filenames:
                     fpath = Path(dirpath) / fname
+                    if self._is_excluded(fpath):
+                        continue
                     if self._is_scannable(fpath):
                         result.files_scanned += 1
                         result.findings.extend(self.scan_file(fpath))
@@ -366,7 +379,7 @@ def format_text(result: ScanResult) -> str:
     lines.append(sep)
 
     if not result.findings:
-        lines.append("\n  ✅  No secrets detected. Scan PASSED.\n")
+        lines.append("\n  No secrets detected. Scan PASSED.\n")
     else:
         for i, f in enumerate(result.findings, 1):
             lines.append(f"\n  [{i}] {f.severity} | {f.secret_type} | Confidence: {f.confidence}%")
@@ -377,7 +390,7 @@ def format_text(result: ScanResult) -> str:
             lines.append(f"      Fix       : {f.remediation}")
 
     lines.append("\n" + sep)
-    status = "✅  PASSED" if result.passed else "❌  FAILED — secrets detected"
+    status = "PASSED" if result.passed else "FAILED - secrets detected"
     lines.append(f"  RESULT: {status}")
     lines.append(sep + "\n")
     return "\n".join(lines)
@@ -388,7 +401,7 @@ def format_text(result: ScanResult) -> str:
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(
-        description="Secret Detection Engine — scans source code for hardcoded secrets",
+        description="Secret Detection Engine - scans source code for hardcoded secrets",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -409,6 +422,14 @@ Examples:
         help="Minimum severity level to report",
     )
     parser.add_argument("--output", default=None, help="Write report to file instead of stdout")
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=None,
+        metavar="SUBSTRING",
+        help="Exclude paths containing this substring (repeatable). "
+             "Example: --exclude tests/samples --exclude node_modules",
+    )
 
     args = parser.parse_args()
 
@@ -416,7 +437,11 @@ Examples:
         print(f"Error: path '{args.path}' does not exist.", file=sys.stderr)
         sys.exit(2)
 
-    detector = SecretDetector(path=args.path, severity_filter=args.severity)
+    detector = SecretDetector(
+        path=args.path,
+        severity_filter=args.severity,
+        exclude=args.exclude,
+    )
     result = detector.scan()
 
     report = format_json(result) if args.format == "json" else format_text(result)
@@ -425,7 +450,12 @@ Examples:
         Path(args.output).write_text(report, encoding="utf-8")
         print(f"Report written to {args.output}")
     else:
-        print(report)
+        # Guard against Windows consoles (cp1252) that can't encode emoji.
+        try:
+            print(report)
+        except UnicodeEncodeError:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            print(report)
 
     # Exit code 1 = secrets found (for CI quality gate integration)
     sys.exit(0 if result.passed else 1)
