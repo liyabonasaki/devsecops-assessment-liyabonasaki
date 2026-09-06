@@ -605,6 +605,19 @@ jobs:
           except: print(0)
           ")
             echo "  $report -> CRITICAL: $CRITICAL  HIGH: $HIGH"
+            # Print the offending CRITICAL packages/CVEs for actionable output
+            if [ "$CRITICAL" -gt "0" ]; then
+              echo "    CRITICAL details in $report:"
+              python3 -c "
+          import json
+          d=json.load(open('$report'))
+          for r in (d.get('Results',[]) or []):
+            tgt=r.get('Target','?')
+            for v in (r.get('Vulnerabilities') or []):
+              if v.get('Severity')=='CRITICAL':
+                print(f\"      [{tgt}] {v.get('PkgName')} {v.get('InstalledVersion')} -> {v.get('VulnerabilityID')} (fixed: {v.get('FixedVersion','n/a')})\")
+          "
+            fi
             TOTAL_CRITICAL=$((TOTAL_CRITICAL + CRITICAL))
             TOTAL_HIGH=$((TOTAL_HIGH + HIGH))
           done

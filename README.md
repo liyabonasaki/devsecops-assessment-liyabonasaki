@@ -174,7 +174,7 @@ prerequisites.
        Spring Security policy bypass); resolves to Tomcat 10.1.59 + Spring
        Security 6.5.11, verified with 8/8 tests passing
   - Every code/build fix was verified by re-running the relevant build/test locally
-    before commit. The npm-audit policy change could not be run locally (no Node.js
+    before commit. The npm-audit policy change could not be run locally (Node.js
     on the dev machine) and is validated by the pipeline itself.
 
 ---
@@ -213,10 +213,10 @@ directly into CI as a blocking step.
 
 | Job | Scanners | Blocks on failure? |
 |-----|----------|-------------------|
-| Secret Detection | Custom Python engine | Yes Yes - blocks all downstream |
-| Frontend Security | npm audit, Semgrep JS/React, license-checker | Yes Yes - CRITICAL in *production* deps (dev-tooling advisories reported but non-blocking; see triage doc) |
-| Backend Security | OWASP Dependency-Check, Semgrep Java | Yes Yes (CVSS >= 7) |
-| Container Security | Trivy IaC config, Trivy image x2 | Yes Yes (CRITICAL only) |
+| Secret Detection | Custom Python engine | Yes - blocks all downstream |
+| Frontend Security | npm audit, Semgrep JS/React, license-checker | Yes - CRITICAL in *production* deps (dev-tooling advisories reported but non-blocking; see triage doc) |
+| Backend Security | OWASP Dependency-Check, Semgrep Java | Yes (CVSS >= 7) |
+| Container Security | Trivy IaC config, Trivy image x2 | Yes (CRITICAL only) |
 
 All reports uploaded as artifacts for 30 days. See `docs/pipeline-security.md`.
 The frontend npm-audit risk policy is documented in `docs/frontend-audit-triage.md`.

@@ -26,10 +26,10 @@ infrastructure/
 
 | Stage | Image | Purpose | Ships to production? |
 |-------|-------|---------|---------------------|
-| builder (backend) | `eclipse-temurin:17-jdk-alpine` | Compile JAR | No No |
-| runtime (backend) | `eclipse-temurin:17-jre-alpine` | Run JAR | Yes Yes |
-| builder (frontend) | `node:18-alpine` | `npm build` | No No |
-| runtime (frontend) | `nginx:1.27-alpine` | Serve static files | Yes Yes |
+| builder (backend) | `eclipse-temurin:17-jdk-alpine` | Compile JAR | No |
+| runtime (backend) | `eclipse-temurin:17-jre-alpine` | Run JAR | Yes |
+| builder (frontend) | `node:18-alpine` | `npm build` | No |
+| runtime (frontend) | `nginx:1.30-alpine` | Serve static files | Yes |
 
 **Why it matters**: The build stage contains Maven, npm, all `node_modules`, the JDK,
 and build caches - all potential attack surface. None of it reaches the final image.
@@ -214,6 +214,6 @@ updates - not by application changes.
 | `eclipse-temurin:17-jdk-alpine` | Adoptium LTS (Java 17), smaller than Debian-based, actively patched |
 | `eclipse-temurin:17-jre-alpine` | JRE only - removes compiler, jshell, javac from final image |
 | `node:18-alpine` | LTS Node, Alpine reduces CVE surface vs Debian node |
-| `nginx:1.27-alpine` | Current stable, Alpine base, minimal footprint (~40 MB) |
+| `nginx:1.30-alpine` | Current stable (stable-alpine, Alpine 3.24), patched OpenSSL, minimal footprint |
 
 All base images use pinned minor versions (not `latest`) to ensure reproducible builds.

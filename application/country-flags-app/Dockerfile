@@ -49,7 +49,7 @@ COPY .babelrc babel.config.cjs jest.config.json ./
 RUN npm run build
 
 # -- Stage 2: Runtime (Nginx) --------------------------------------------------
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.30-alpine AS runtime
 
 LABEL maintainer="liyabona.saki" \
       org.opencontainers.image.title="country-flags-app" \
